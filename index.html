@@ -280,6 +280,54 @@
     .score-value .type-hint {
       margin-left: 8px;
     }
+ @media (max-width: 700px) {
+  .table-wrapper table,
+  .table-wrapper thead,
+  .table-wrapper tbody,
+  .table-wrapper tr,
+  .table-wrapper td {
+    display: block;
+    width: 100%;
+  }
+  .table-wrapper thead {
+    display: none;
+  }
+  .table-wrapper tr {
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #eaeef6;
+    padding: 0.5rem 0.8rem 0.8rem 0.8rem;
+    background: #ffffff;
+    border-radius: 12px;
+  }
+  .table-wrapper td {
+    border: none;
+    padding: 0.2rem 0;
+    text-align: left;
+  }
+  .table-wrapper td.q-num {
+    font-weight: 700;
+    color: #1e2b4f;
+    font-size: 1rem;
+    margin-bottom: 0.2rem;
+  }
+  .table-wrapper td.q-text {
+    font-size: 1rem;
+    line-height: 1.5;
+    margin-bottom: 0.6rem;
+    color: #1f2a44;
+  }
+  .table-wrapper td.q-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-start;
+    padding-top: 0.2rem;
+  }
+  .btn-check {
+    width: 56px;
+    height: 56px;
+    font-size: 1.6rem;
+  }
+}
   </style>
 </head>
 <body>
