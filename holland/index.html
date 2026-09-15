@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>霍兰德职业兴趣量表 (SDS) · 点击测评</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: #f5f7fb;
+      padding: 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .app-container {
+      max-width: 1100px;
+      width: 100%;
+      background: white;
+      border-radius: 32px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+      padding: 2rem 1.5rem 2rem 1.5rem;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      color: #1e2b4f;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 0.25rem;
+    }
+    .subhead {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+      color: #4a5b7a;
+      font-size: 1rem;
+      border-bottom: 1px solid #e2e8f2;
+      padding-bottom: 1rem;
+    }
+    .progress-badge {
+      background: #eef2fa;
+      padding: 0.4rem 1.1rem;
+      border-radius: 40px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: #1e2b4f;
+    }
+    .legend {
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.9rem;
+      background: #f2f6fe;
+      padding: 0.6rem 1.2rem;
+      border-radius: 40px;
+    }
+    .legend span::before {
+      content: "[x] ";
+      margin-right: 6px;
+      font-size: 0.8rem;
+      vertical-align: middle;
+    }
+    .legend .r::before { color: #3b82f6; }
+    .legend .i::before { color: #8b5cf6; }
+    .legend .a::before { color: #ec4899; }
+    .legend .s::before { color: #10b981; }
+    .legend .e::before { color: #f59e0b; }
+    .legend .c::before { color: #6b7280; }
+
+    /* 表格样式 */
+    .table-wrapper {
+      overflow-x: auto;
+      border-radius: 20px;
+      border: 1px solid #e2e8f2;
+      background: white;
+      margin-bottom: 2rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+      min-width: 680px;
+    }
+    th {
+      background: #f8faff;
+      font-weight: 600;
+      color: #1e2b4f;
+      padding: 1rem 0.8rem;
+      text-align: left;
+      border-bottom: 2px solid #d0daea;
+      white-space: nowrap;
+    }
+    td {
+      padding: 0.7rem 0.8rem;
+      border-bottom: 1px solid #eaeef6;
+      vertical-align: middle;
+      color: #1f2a44;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    .q-num {
+      font-weight: 500;
+      color: #6b7b9e;
+      width: 48px;
+    }
+    .q-text {
+      max-width: 450px;
+      line-height: 1.4;
+    }
+    .q-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      min-width: 130px;
+    }
+    .btn-check {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid #d0daea;
+      background: white;
+      font-size: 1.2rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+      color: #6b7b9e;
+    }
+    .btn-check:hover {
+      background: #f0f5ff;
+      border-color: #98aec9;
+    }
+    .btn-check.active-yes {
+      background: #1e2b4f;
+      border-color: #1e2b4f;
+      color: white;
+      box-shadow: 0 6px 12px rgba(30, 43, 79, 0.25);
+    }
+    .btn-check.active-no {
+      background: #f1f3f7;
+      border-color: #b9c2d4;
+      color: #3d4e6e;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .btn-check.active-no span {
+      font-weight: 700;
+    }
+
+    /* 分数卡片 */
+    .scores-section {
+      background: #f9fbfe;
+      border-radius: 24px;
+      padding: 1.8rem 1.5rem;
+      margin: 1.5rem 0 1rem 0;
+    }
+    .scores-title {
+      font-weight: 600;
+      color: #1e2b4f;
+      font-size: 1.2rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .scores-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem 2rem;
+      justify-content: space-between;
+    }
+    .score-item {
+      flex: 1 1 120px;
+      background: white;
+      border-radius: 18px;
+      padding: 0.9rem 1.2rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+      border: 1px solid #e6ecf5;
+    }
+    .score-label {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #7082a6;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .score-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #1e2b4f;
+      line-height: 1.2;
+    }
+    .score-value small {
+      font-size: 0.9rem;
+      font-weight: 400;
+      color: #9aaac9;
+      margin-left: 6px;
+    }
+
+    .result-area {
+      background: #ffffff;
+      border: 2px dashed #cdd9f0;
+      border-radius: 24px;
+      padding: 2rem 1.8rem;
+      margin-top: 1.8rem;
+      text-align: center;
+    }
+    .code-badge {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: 0.2em;
+      color: #1e2b4f;
+      background: #ecf2fe;
+      display: inline-block;
+      padding: 0.25rem 1.2rem 0.25rem 1.8rem;
+      border-radius: 80px;
+      margin: 0.5rem 0 1rem 0;
+      border: 1px solid #b7c9e8;
+    }
+    .code-desc {
+      font-size: 1.1rem;
+      color: #3d4e6e;
+      margin-bottom: 0.5rem;
+    }
+    .reset-btn {
+      background: white;
+      border: 1.5px solid #cdd9f0;
+      padding: 0.8rem 2rem;
+      border-radius: 40px;
+      font-size: 1rem;
+      font-weight: 500;
+      color: #1e2b4f;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-top: 1rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+    }
+    .reset-btn:hover {
+      background: #f2f7ff;
+      border-color: #98aec9;
+    }
+    .footer-note {
+      text-align: center;
+      margin-top: 1.8rem;
+      color: #8f9fb8;
+      font-size: 0.85rem;
+    }
+    .btn-check span {
+      display: inline-block;
+      transition: transform 0.1s;
+    }
+    .btn-check:active span {
+      transform: scale(0.9);
+    }
+    .hidden {
+      display: none;
+    }
+    .type-hint {
+      font-size: 0.85rem;
+      color: #7b8aa6;
+      margin-left: 4px;
+      font-weight: 400;
+    }
+    .score-value .type-hint {
+      margin-left: 8px;
+    }
+  @media (max-width: 700px) {
+  .table-wrapper table,
+  .table-wrapper thead,
+  .table-wrapper tbody,
+  .table-wrapper tr,
+  .table-wrapper td {
+    display: block;
+    width: 100%;
+  }
+  .table-wrapper thead {
+    display: none;
+  }
+  .table-wrapper tr {
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #eaeef6;
+    padding: 0.5rem 0.8rem 0.8rem 0.8rem;
+    background: #ffffff;
+    border-radius: 12px;
+  }
+  .table-wrapper td {
+    border: none;
+    padding: 0.2rem 0;
+    text-align: left;
+  }
+  .table-wrapper td.q-num {
+    font-weight: 700;
+    color: #1e2b4f;
+    font-size: 1rem;
+    margin-bottom: 0.2rem;
+  }
+  .table-wrapper td.q-text {
+    font-size: 1rem;
+    line-height: 1.5;
+    margin-bottom: 0.6rem;
+    color: #1f2a44;
+  }
+  .table-wrapper td.q-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-start;
+    padding-top: 0.2rem;
+  }
+  .btn-check {
+    width: 56px;
+    height: 56px;
+    font-size: 1.6rem;
+  }
+}
+  </style>
+</head>
+<body>
+<div class="app-container">
+  <h1>🧭 霍兰德职业兴趣量表 (SDS)</h1>
+  <div class="subhead">
+    <div>点击 <strong>√</strong> 表示符合，点击 <strong>×</strong> 表示不符合 — 每题必答</div>
+    <div class="progress-badge" id="progressDisplay">已答 0 / 90</div>
+  </div>
+
+  <div class="legend">
+    <span class="r">现实型 R</span>
+    <span class="i">研究型 I</span>
+    <span class="a">艺术型 A</span>
+    <span class="s">社会型 S</span>
+    <span class="e">企业型 E</span>
+    <span class="c">常规型 C</span>
+  </div>
+
+  <!-- 问题列表动态渲染 -->
+  <div class="table-wrapper">
+    <table id="questionTable">
+      <thead>
+        <tr>
+          <th style="width:50px;">题号</th>
+          <th>陈述</th>
+          <th style="text-align:right; padding-right:1.8rem;">符合 / 不符合</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <!-- JS 填充 -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 得分统计 -->
+  <div class="scores-section">
+    <div class="scores-title"> 当前得分</div>
+    <div class="scores-grid" id="scoresGrid">
+      <!-- 动态得分 -->
+    </div>
+  </div>
+
+  <!-- 结果判定 -->
+  <div class="result-area" id="resultArea">
+    <div class="code-desc">你的霍兰德代码</div>
+    <div class="code-badge" id="hollandCode">---</div>
+    <div id="resultDetail" style="color:#4a5b7a; font-size:0.95rem; max-width: 600px; margin: 0 auto;"></div>
+    <button class="reset-btn" id="resetBtn">⟲ 重新测评</button>
+  </div>
+  <div class="footer-note">
+    计分规则：统计每个类型中打“√”的题目数量，取最高的3个类型组成代码（如 RIA、SEC）。
+  </div>
+</div>
+
+<script>
+  // --------------------------------------------------------------
+  // 1. 数据定义：90个陈述 (按题号顺序)
+  // --------------------------------------------------------------
+  const statements = [
+    // 1-25 (page1)
+    "强壮而敏捷的身体对我很重要",
+    "我必须彻底地了解事情的真相",
+    "我的心情受音乐、色彩和美丽事物的影响极大",
+    "和他人的关系丰富了我的生命并使它有意义",
+    "我自信会成功",
+    "我做事必须有清楚的指引",
+    "我擅长于自己制作、修理东西",
+    "我可以花很长的时间去想通事情的道理",
+    "我重视美丽的环境",
+    "我愿意花时间帮别人解决个人危机",
+    "我喜欢竞争",
+    "我在开始一个计划前会花很多时间去计划",
+    "我喜欢使用双手做事",
+    "探索新构思使我满意",
+    "我是寻求新方法来发挥我的创造力",
+    "我认为能把自己的焦虑和别人分担是很重要的",
+    "成为群体中的关键任务执行者，对我很重要",
+    "我对于自己能重视工作中的所有细节感到骄傲",
+    "我不在乎工作把手弄脏",
+    "我认为教育是个发展及磨练脑力的终身学习过程",
+    "我喜欢非正式的穿着，尝试新颜色和款式",
+    "我常能体会到某人想要和他人沟通的需要",
+    "我喜欢帮助别人不断改进",
+    "我在决策时，通常不愿冒险",
+    "我喜欢购买小零件，做成成品",
+    // 26-66 (page2)
+    "有时我长时间阅读、玩拼图游戏，冥想生命本质",
+    "我有很强的想象力",
+    "我喜欢帮助别人发挥天赋和才能",
+    "我喜欢监督事情直至完工",
+    "如果我面对一个新情景，会在事前做充分的准备",
+    "我喜欢独立完成一项任务",
+    "我渴望阅读或思考任何可以引发我好奇心的东西",
+    "我喜欢尝试创新的概念",
+    "如果我和别人摩擦，我会不断尝试化干戈为玉帛",
+    "要成功就必须定高目标",
+    "我喜欢为重大决策负责",
+    "我喜欢直言不讳，不喜欢转弯抹角",
+    "我在解决问题前，必须把问题进行彻底分析",
+    "我喜欢重新布置我的环境，使他们与众不同",
+    "我经常借着和别人交谈来解决自己的问题",
+    "我常想起草一个计划，而由别人完成细节",
+    "准时对我来说非常重要",
+    "从事户外活动令我神清气爽",
+    "我不断地问：为什么？",
+    "我喜欢自己的工作能够抒发我的情绪和感觉",
+    "我喜欢帮助别人找到可以和他人相互关注的办法",
+    "能够参与重大决策是件令人兴奋的事情",
+    "我经常保持清洁，喜欢有条不紊",
+    "我喜欢周边环境简单而实际",
+    "我会不断地思索一个问题，直到找出答案为止",
+    "大自然的美深深地触动我的灵魂",
+    "亲密的人际关系对我很重要",
+    "升迁和进步对我极重要",
+    "当我把每日工作计划好时，我会较有安全感",
+    "我不害怕过重工作负荷，且知道工作的重点",
+    "我喜欢能使我思考、给我新观念的书",
+    "我希望能看到艺术表演、戏剧及好的电影",
+    "我对别人的情绪低潮相当的敏感",
+    "能影响别人使我感到兴奋",
+    "当我答应一件事时，我会竭尽监督所有细节",
+    "我希望粗重的肢体工作不会伤害任何人",
+    "我希望能学习所有使我感兴趣的科目",
+    "我希望能做些与众不同的事",
+    "我对别人的困难乐于伸出援手",
+    "我愿意冒一点险以求进步",
+    "当我遵循成规时，我感到安全",
+    // 67-90 (page3)
+    "我选车时，最先注意的是好的引擎",
+    "我喜欢能刺激我思考的话",
+    "当我从事创造性的事时，我会忘掉一切旧经验",
+    "我对社会上有许多人需要帮助感到关注",
+    "说服别人依计划行事是件有趣的事情",
+    "我擅长于检查细节",
+    "我通常知道如何应付紧急事件",
+    "阅读新发现的书刊是令人兴奋的事情",
+    "我喜欢美丽、不平凡的东西",
+    "我经常关心孤独、不友善的人",
+    "我喜欢讨价还价",
+    "我花钱时小心翼翼",
+    "我用运动来保持强壮的身体",
+    "我经常对大自然的奥秘感到好奇",
+    "尝试不平凡的新事物是件相当有趣的事情",
+    "当别人像我诉说他的困难时，我是个好听众",
+    "做事失败了，我会再接再厉",
+    "我需要确切地知道别人对我的要求是什么",
+    "我喜欢把东西拆开，看看能否修理它们",
+    "我喜欢研读所有的事实，再有逻辑地做出决定",
+    "没有美丽事物的生活，对我而言是不可思议的",
+    "人们经常告诉我他们的问题",
+    "我常能借着资讯网络和别人取得联系",
+    "小心谨慎地完史一件事是件有成就感的事情"
+  ];
+
+  // 检查长度
+  if (statements.length !== 90) console.warn('题目数量不是90，请检查');
+
+  // 2. 类型-题号映射 (根据文档)
+  const typeMap = {
+    R: [1,7,13,19,25,31,37,43,49,55,61,67,73,79,85],
+    I: [2,8,14,20,26,32,38,44,50,56,62,68,74,80,86],
+    A: [3,9,15,21,27,33,39,45,51,57,63,69,75,81,87],
+    S: [4,10,16,22,28,34,40,46,52,58,64,70,76,82,88],
+    E: [5,11,17,23,29,35,41,47,53,59,65,71,77,83,89],
+    C: [6,12,18,24,30,36,42,48,54,60,66,72,78,84,90]
+  };
+
+  // 全类型名称
+  const typeNames = {
+    R: '现实型', I: '研究型', A: '艺术型',
+    S: '社会型', E: '企业型', C: '常规型'
+  };
+
+  // 3. 状态存储：每个题目的选择 (true=√, false=×, null=未选)
+  let answers = new Array(90).fill(null); // index 0 对应题号1
+
+  // 4. 获取 DOM 元素
+  const tbody = document.getElementById('tableBody');
+  const progressDisplay = document.getElementById('progressDisplay');
+  const scoresGrid = document.getElementById('scoresGrid');
+  const hollandCodeEl = document.getElementById('hollandCode');
+  const resultDetail = document.getElementById('resultDetail');
+  const resetBtn = document.getElementById('resetBtn');
+
+  // 5. 渲染表格
+  function renderTable() {
+    tbody.innerHTML = '';
+    statements.forEach((text, idx) => {
+      const qNum = idx + 1;
+      const tr = document.createElement('tr');
+      tr.dataset.qIndex = idx;
+
+      // 题号
+      const tdNum = document.createElement('td');
+      tdNum.className = 'q-num';
+      tdNum.textContent = qNum;
+      tr.appendChild(tdNum);
+
+      // 陈述
+      const tdText = document.createElement('td');
+      tdText.className = 'q-text';
+      tdText.textContent = text;
+      tr.appendChild(tdText);
+
+      // 按钮区域
+      const tdActions = document.createElement('td');
+      tdActions.className = 'q-actions';
+
+      const btnYes = document.createElement('button');
+      btnYes.className = 'btn-check yes-btn';
+      btnYes.innerHTML = '<span>√</span>';
+      btnYes.setAttribute('aria-label', '符合');
+      btnYes.dataset.value = 'true';
+
+      const btnNo = document.createElement('button');
+      btnNo.className = 'btn-check no-btn';
+      btnNo.innerHTML = '<span>×</span>';
+      btnNo.setAttribute('aria-label', '不符合');
+      btnNo.dataset.value = 'false';
+
+      // 高亮逻辑
+      const currentAnswer = answers[idx];
+      if (currentAnswer === true) {
+        btnYes.classList.add('active-yes');
+      } else if (currentAnswer === false) {
+        btnNo.classList.add('active-no');
+      }
+
+      btnYes.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setAnswer(idx, true);
+      });
+      btnNo.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setAnswer(idx, false);
+      });
+
+      tdActions.appendChild(btnYes);
+      tdActions.appendChild(btnNo);
+      tr.appendChild(tdActions);
+      tbody.appendChild(tr);
+    });
+  }
+
+  // 6. 设置答案并更新界面
+  function setAnswer(index, value) {
+    // 如果点击相同的值，允许取消选中？但为了符合“每题必答”，我们不允许取消，直接覆盖。
+    // 但用户如果点同一个按钮两次，可能想取消？但题目要求每题必答，我们保留覆盖，不取消。
+    // 但是为了体验，如果点击同一个并且已经是那个值，可以维持。但有些用户可能想清空，不过需求是必须选。
+    // 所以我们只覆盖。
+    answers[index] = value;
+
+    // 更新对应行的按钮样式
+    const row = tbody.querySelector(`tr[data-q-index="${index}"]`);
+    if (row) {
+      const yesBtn = row.querySelector('.yes-btn');
+      const noBtn = row.querySelector('.no-btn');
+      yesBtn.classList.remove('active-yes', 'active-no');
+      noBtn.classList.remove('active-yes', 'active-no');
+      if (value === true) {
+        yesBtn.classList.add('active-yes');
+      } else if (value === false) {
+        noBtn.classList.add('active-no');
+      }
+    }
+
+    // 更新进度和分数
+    updateProgress();
+    updateScoresAndResult();
+  }
+
+  // 7. 计算各类型得分 (√ 数量)
+  function computeScores() {
+    const scores = { R:0, I:0, A:0, S:0, E:0, C:0 };
+    // 遍历每个类型
+    for (const [type, qIndices] of Object.entries(typeMap)) {
+      let count = 0;
+      qIndices.forEach(qNum => {
+        const idx = qNum - 1; // 题号从1开始
+        if (answers[idx] === true) count++;
+      });
+      scores[type] = count;
+    }
+    return scores;
+  }
+
+  // 8. 更新进度显示
+  function updateProgress() {
+    const answered = answers.filter(a => a !== null).length;
+    progressDisplay.textContent = `已答 ${answered} / 90`;
+  }
+
+  // 9. 更新得分网格 & 结果代码
+  function updateScoresAndResult() {
+    const scores = computeScores();
+
+    // 渲染得分卡片
+    scoresGrid.innerHTML = '';
+    const typesOrder = ['R', 'I', 'A', 'S', 'E', 'C'];
+    typesOrder.forEach(type => {
+      const div = document.createElement('div');
+      div.className = 'score-item';
+      div.innerHTML = `
+        <div class="score-label">${type} · ${typeNames[type]}</div>
+        <div class="score-value">${scores[type]}<small>√</small></div>
+      `;
+      scoresGrid.appendChild(div);
+    });
+
+    // 生成霍兰德代码：取最高的3个类型，按得分降序，得分相同按字母顺序或固定顺序？按照习惯，得分相同则按类型字母顺序或保持原顺序。
+    // 我们按得分降序，得分相同则按字母顺序 A,C,E,I,R,S? 但更常见是保留原始类型顺序（R,I,A,S,E,C）？
+    // 为了稳定，使用类型顺序 R I A S E C 作为次要排序，保证结果可复现。
+    const typePriority = { R:1, I:2, A:3, S:4, E:5, C:6 };
+    const sorted = Object.entries(scores)
+      .sort((a, b) => {
+        if (b[1] !== a[1]) return b[1] - a[1]; // 降序
+        return typePriority[a[0]] - typePriority[b[0]]; // 同分按 R I A S E C 顺序
+      });
+
+    // 取前三名
+    const top3 = sorted.slice(0, 3).map(item => item[0]);
+    // 但是有可能全部是0分，那也照常显示
+    const code = top3.join('');
+    hollandCodeEl.textContent = code || '---';
+
+    // 详情描述
+    const top3Names = top3.map(t => `${t} (${typeNames[t]})`).join(' · ');
+    const allScoresStr = typesOrder.map(t => `${t}:${scores[t]}`).join('  ');
+    if (answers.every(a => a === null)) {
+      resultDetail.textContent = '还没有任何选择，点击√或×开始测评。';
+    } else {
+      resultDetail.innerHTML = `前三类型：${top3Names}<br><span style="font-size:0.85rem; color:#7b8aa6;">全部得分 — ${allScoresStr}</span>`;
+    }
+  }
+
+  // 10. 重置所有
+  function resetAll() {
+    answers = new Array(90).fill(null);
+    // 重新渲染表格以清除所有高亮
+    renderTable();
+    updateProgress();
+    updateScoresAndResult();
+  }
+
+  // 11. 初始化
+  function init() {
+    renderTable();
+    updateProgress();
+    updateScoresAndResult();
+
+    // 重置按钮事件
+    resetBtn.addEventListener('click', resetAll);
+  }
+
+  // 页面加载后执行
+  window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
