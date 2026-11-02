@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>极简记账 · Asakim</title>
-  <!-- 引入 Chart.js 用于生成图表 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -211,12 +210,17 @@
     .report-item:last-child { border-bottom: none; }
     .report-total { font-size: 1.2rem; font-weight: 700; color: #1e2b4f; text-align: right; margin-top: 1rem; padding-top: 1rem; border-top: 2px solid #eef2f8;}
 
-    /* 导出弹窗专用链接按钮 */
+    /* 导出弹窗专用 */
     .export-link-btn {
       display: inline-block; background: #1e2b4f; color: white; text-decoration: none;
-      padding: 0.6rem 1.2rem; border-radius: 12px; margin-top: 1rem; font-weight: 600;
+      padding: 0.6rem 1.2rem; border-radius: 12px; font-weight: 600; border: none; cursor: pointer;
     }
     .export-link-btn:hover { background: #2a3d6b; }
+    .export-textarea {
+      width: 100%; height: 100px; padding: 10px; margin-top: 10px;
+      border: 1px solid #e6ecf5; border-radius: 8px; background: #f9fbfe;
+      font-family: monospace; font-size: 12px; color: #6b7b9e; resize: none;
+    }
 
     /* ===== 手机端适配 ===== */
     @media (max-width: 600px) {
@@ -335,12 +339,15 @@
       <div class="modal-title">📥 导出账本</div>
     </div>
     <p style="color: #6b7b9e; font-size: 0.9rem; margin-bottom: 1rem;">
-      请点击下方按钮保存文件：
+      请尝试点击下载，或者直接复制下方文本粘贴到 Excel。
     </p>
-    <a id="downloadLink" class="export-link-btn" href="#">点击下载 CSV 文件</a>
-    <p style="color: #9aaac9; font-size: 0.75rem; margin-top: 1.5rem;">
-      提示：如果无法下载，请点击右上角选择“在浏览器中打开”再试。
-    </p>
+    <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 1rem;">
+      <a id="downloadLink" class="export-link-btn" href="#">点击下载文件</a>
+      <button id="copyCsvBtn" class="export-link-btn" style="background: #5b8ff9;">一键复制文本</button>
+    </div>
+    
+    <textarea id="csvTextArea" class="export-textarea" readonly></textarea>
+    
     <button class="btn" id="closeExportBtn" style="margin-top: 1rem;">关闭</button>
   </div>
 </div>
@@ -1034,7 +1041,7 @@
     save(); render();
   });
 
-  // ====== 数据工具：下拉菜单与功能 ======
+  // ====== 数据工具下拉菜单 ======
   const dataToolBtn = document.getElementById('dataToolBtn');
   const dataToolMenu = document.getElementById('dataToolMenu');
   
@@ -1043,6 +1050,12 @@
     dataToolMenu.classList.toggle('show');
   });
 
+  // 关键修复：阻止菜单内的点击事件冒泡到 document，避免菜单提前关闭
+  dataToolMenu.addEventListener('click', function(e) {
+    e.stopPropagation(); 
+  });
+
+  // 点击外部关闭菜单
   document.addEventListener('click', function(e) {
     if (!dataToolMenu.contains(e.target) && e.target !== dataToolBtn) {
       dataToolMenu.classList.remove('show');
@@ -1055,14 +1068,15 @@
     '#6dc8ec', '#9270ca', '#ff9d4d', '#269a99', '#ff99c3'
   ];
 
-  // ====== 导出功能（修复：使用标准的 Blob URL） ======
+  // ====== 导出功能 ======
   const exportModal = document.getElementById('exportModal');
   const closeExportBtn = document.getElementById('closeExportBtn');
   const downloadLink = document.getElementById('downloadLink');
+  const csvTextArea = document.getElementById('csvTextArea');
+  const copyCsvBtn = document.getElementById('copyCsvBtn');
 
   function closeExport() {
     exportModal.classList.remove('show');
-    // 释放内存
     if (downloadLink.href.startsWith('blob:')) {
       URL.revokeObjectURL(downloadLink.href);
     }
@@ -1072,6 +1086,23 @@
   closeExportBtn.addEventListener('click', closeExport);
   exportModal.addEventListener('click', (e) => {
     if (e.target === exportModal) closeExport();
+  });
+
+  // 一键复制
+  copyCsvBtn.addEventListener('click', function() {
+    csvTextArea.select();
+    csvTextArea.setSelectionRange(0, 99999); // 适配手机
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        this.textContent = '✅ 复制成功';
+        setTimeout(() => { this.textContent = '一键复制文本'; }, 2000);
+      } else {
+        alert('复制失败，请长按文本框手动复制');
+      }
+    } catch (err) {
+      alert('复制失败，请长按文本框手动复制');
+    }
   });
 
   document.getElementById('exportCsvBtn').addEventListener('click', function() {
@@ -1097,10 +1128,12 @@
       }
     });
 
-    // 核心修复：使用 Blob 生成真实的文件对象，这在 PC 和手机上兼容性都是最好的
+    // 填入文本框供复制
+    csvTextArea.value = csvContent;
+
+    // 生成 Blob 链接供下载
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    
     downloadLink.href = url;
     downloadLink.download = `Asakim账本_${state.currentYear}年${state.currentMonth}月.csv`;
     
