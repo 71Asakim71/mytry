@@ -320,28 +320,26 @@
       <div class="modal-title" id="modalTitle">报表</div>
       <button class="modal-close" id="closeModalBtn">×</button>
     </div>
-    <!-- 图表容器 -->
     <div class="chart-container">
       <canvas id="reportChart"></canvas>
     </div>
-    <!-- 列表容器 -->
     <div class="report-list-title">详细数据</div>
     <div id="reportBody"></div>
   </div>
 </div>
 
-<!-- 导出弹窗（专为手机适配） -->
+<!-- 导出弹窗 -->
 <div class="modal-overlay" id="exportModal">
   <div class="modal-content" style="text-align: center;">
     <div class="modal-header" style="justify-content: center;">
       <div class="modal-title">📥 导出账本</div>
     </div>
     <p style="color: #6b7b9e; font-size: 0.9rem; margin-bottom: 1rem;">
-      由于手机浏览器限制，请点击下方按钮保存文件：
+      请点击下方按钮保存文件：
     </p>
     <a id="downloadLink" class="export-link-btn" href="#">点击下载 CSV 文件</a>
     <p style="color: #9aaac9; font-size: 0.75rem; margin-top: 1.5rem;">
-      提示：若无法下载，请点击右上角选择“在浏览器中打开”后重试。
+      提示：如果无法下载，请点击右上角选择“在浏览器中打开”再试。
     </p>
     <button class="btn" id="closeExportBtn" style="margin-top: 1rem;">关闭</button>
   </div>
@@ -545,7 +543,6 @@
       sum % 1 === 0 ? sum.toString() : sum.toFixed(2);
   }
 
-  // 局部更新父行金额显示，不引发重绘
   function updateParentAmountDisplay(ri) {
     const ledger = getLedger();
     const row = ledger.rows[ri];
@@ -815,7 +812,6 @@
                   child.cells[ci] = this.textContent;
                   save();
                   if (ci === amtIdx) {
-                    // 修复键盘收起BUG：只更新数据，不重绘 DOM
                     updateParentAmountDisplay(ri);
                     renderTotal();
                   }
@@ -1059,17 +1055,30 @@
     '#6dc8ec', '#9270ca', '#ff9d4d', '#269a99', '#ff99c3'
   ];
 
-  // 1. 导出 CSV (修复手机端下载问题)
+  // ====== 导出功能（修复：使用标准的 Blob URL） ======
   const exportModal = document.getElementById('exportModal');
   const closeExportBtn = document.getElementById('closeExportBtn');
   const downloadLink = document.getElementById('downloadLink');
 
-  closeExportBtn.addEventListener('click', () => exportModal.classList.remove('show'));
+  function closeExport() {
+    exportModal.classList.remove('show');
+    // 释放内存
+    if (downloadLink.href.startsWith('blob:')) {
+      URL.revokeObjectURL(downloadLink.href);
+    }
+    downloadLink.href = '#';
+  }
+
+  closeExportBtn.addEventListener('click', closeExport);
+  exportModal.addEventListener('click', (e) => {
+    if (e.target === exportModal) closeExport();
+  });
 
   document.getElementById('exportCsvBtn').addEventListener('click', function() {
     dataToolMenu.classList.remove('show');
     const ledger = getLedger();
     const amtIdx = amountColumnIndex(ledger);
+    
     let csvContent = "";
     csvContent += ledger.columns.join(",") + "\n";
     
@@ -1088,18 +1097,17 @@
       }
     });
 
-    // 使用 Data URI 方式，更适合移动端浏览器点击真实链接下载
-    const encodedUri = encodeURI("data:text/csv;charset=utf-8,\uFEFF" + csvContent);
-    const fileName = `Asakim账本_${state.currentYear}年${state.currentMonth}月.csv`;
+    // 核心修复：使用 Blob 生成真实的文件对象，这在 PC 和手机上兼容性都是最好的
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     
-    downloadLink.href = encodedUri;
-    downloadLink.download = fileName;
+    downloadLink.href = url;
+    downloadLink.download = `Asakim账本_${state.currentYear}年${state.currentMonth}月.csv`;
     
-    // 显示弹窗让用户手动点击下载
     exportModal.classList.add('show');
   });
 
-  // 报表弹窗相关
+  // ====== 报表弹窗相关 ======
   const reportModal = document.getElementById('reportModal');
   const closeModalBtn = document.getElementById('closeModalBtn');
   const reportBody = document.getElementById('reportBody');
@@ -1117,7 +1125,6 @@
     }
   });
 
-  // 2. 生成月报表 (饼图)
   document.getElementById('monthReportBtn').addEventListener('click', function() {
     dataToolMenu.classList.remove('show');
     const ledger = getLedger();
@@ -1143,7 +1150,6 @@
 
     modalTitle.textContent = `📈 ${state.currentYear}年${state.currentMonth}月 报表`;
     
-    // 渲染图表
     if (myChart) myChart.destroy();
     if (sortedCats.length > 0) {
       myChart = new Chart(ctx, {
@@ -1167,7 +1173,6 @@
       });
     }
 
-    // 渲染列表
     let html = '';
     if (sortedCats.length === 0) {
       html = '<div style="text-align:center; color:#9aaac9; padding: 2rem 0;">本月暂无数据</div>';
@@ -1181,7 +1186,6 @@
     reportModal.classList.add('show');
   });
 
-  // 3. 生成年报表 (柱状图)
   document.getElementById('yearReportBtn').addEventListener('click', function() {
     dataToolMenu.classList.remove('show');
     const y = state.currentYear;
@@ -1205,7 +1209,6 @@
 
     modalTitle.textContent = `📅 ${y}年 报表`;
     
-    // 渲染图表
     if (myChart) myChart.destroy();
     myChart = new Chart(ctx, {
       type: 'bar',
@@ -1231,7 +1234,6 @@
       }
     });
 
-    // 渲染列表
     let html = '';
     const activeMonths = monthSummary.filter(item => item.amount > 0);
     if (activeMonths.length === 0) {
