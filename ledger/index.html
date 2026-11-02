@@ -215,7 +215,6 @@
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed.columns && parsed.rows) {
-          // 兼容老数据
           parsed.rows.forEach(row => {
             if (!row.children) row.children = [];
             if (row.isExpanded === undefined) row.isExpanded = false;
@@ -260,6 +259,7 @@
     }
   }
 
+  // ===== 修复后的表头渲染逻辑 =====
   function renderHead() {
     const thead = document.getElementById('tableHead');
     thead.innerHTML = '';
@@ -267,39 +267,48 @@
     
     state.columns.forEach((col, ci) => {
       const th = document.createElement('th');
-      const textSpan = document.createElement('span');
-      textSpan.textContent = col;
-      textSpan.style.display = 'inline-block';
       
       if (!isDeleteMode) {
+        // 正常模式：直接变成纯文本，直接读取 this.textContent
+        th.textContent = col;
         th.setAttribute('contenteditable', 'true');
         th.style.outline = 'none';
+        
         th.addEventListener('input', function() {
-          state.columns[ci] = textSpan.textContent;
+          state.columns[ci] = this.textContent;
           save();
         });
+        
         th.addEventListener('blur', function() {
-          if (textSpan.textContent.trim() === '') {
-            textSpan.textContent = '未命名';
+          if (this.textContent.trim() === '') {
+            this.textContent = '未命名';
             state.columns[ci] = '未命名';
           } else {
-            state.columns[ci] = textSpan.textContent.trim();
+            state.columns[ci] = this.textContent.trim();
           }
-          save(); renderTotal();
+          save(); 
+          renderTotal();
         });
-        th.appendChild(textSpan);
       } else {
+        // 删除模式：不可编辑，包含文字和删除按钮
         th.style.cursor = 'default';
+        
+        const textSpan = document.createElement('span');
+        textSpan.textContent = col;
+        textSpan.style.display = 'inline-block';
         th.appendChild(textSpan);
+        
         const colDelBtn = document.createElement('button');
         colDelBtn.className = 'col-del-btn';
         colDelBtn.textContent = '✕';
+        colDelBtn.title = '删除此列';
         colDelBtn.addEventListener('click', function(e) {
           e.stopPropagation();
           deleteColumn(ci);
         });
         th.appendChild(colDelBtn);
       }
+      
       tr.appendChild(th);
     });
     
@@ -331,7 +340,6 @@
 
       const hasChildren = row.children && row.children.length > 0;
       
-      // 如果包含子账单，自动计算父行金额
       let autoSum = 0;
       if (hasChildren) {
         row.children.forEach(c => {
@@ -358,7 +366,6 @@
           td.setAttribute('contenteditable', 'false');
         }
         
-        // 处理金额显示
         if (isAutoAmount) {
           td.textContent = autoSum % 1 === 0 ? autoSum.toString() : autoSum.toFixed(2);
           td.className = 'auto-amount';
@@ -369,7 +376,6 @@
         tr.appendChild(td);
       });
 
-      // 父行操作列
       const tdOp = document.createElement('td');
       tdOp.className = 'action-col';
       
@@ -395,7 +401,7 @@
       tr.appendChild(tdOp);
       tbody.appendChild(tr);
 
-      // ====== 渲染子账单 ======
+      // 渲染子账单
       if (row.isExpanded) {
         row.children.forEach((child, cIdx) => {
           const childTr = document.createElement('tr');
@@ -429,7 +435,6 @@
             childTr.appendChild(childTd);
           });
 
-          // 子行操作列（仅在删除模式显示删除按钮）
           const childOp = document.createElement('td');
           childOp.className = 'action-col';
           if (isDeleteMode) {
@@ -439,7 +444,6 @@
             delChild.title = '删除此明细';
             delChild.addEventListener('click', () => {
               row.children.splice(cIdx, 1);
-              // 如果子账单清空，把父行原本金额恢复出来（清空）
               if (row.children.length === 0) row.cells[amtIdx] = '';
               save(); render();
             });
@@ -449,7 +453,6 @@
           tbody.appendChild(childTr);
         });
 
-        // 添加明细按钮（非删除模式）
         if (!isDeleteMode) {
           const addTr = document.createElement('tr');
           addTr.className = 'child-row add-child-row';
@@ -473,7 +476,6 @@
     });
   }
 
-  // 只更新DOM中的父行金额（避免输入子行时整表重绘导致焦点丢失）
   function updateParentAmountDisplay(ri) {
     const row = state.rows[ri];
     const amtIdx = amountColumnIndex();
@@ -483,9 +485,7 @@
       if (!isNaN(val)) sum += val;
     });
     
-    // 找到对应的父行（通过展开按钮的点击事件里的闭包没法直接拿到dom，用querySelector）
     const tbody = document.getElementById('tableBody');
-    // 找到所有行，过滤出主行
     const parentTrs = Array.from(tbody.children).filter(tr => !tr.classList.contains('child-row'));
     const currentTr = parentTrs[ri];
     
@@ -507,7 +507,6 @@
     let sum = 0;
     state.rows.forEach(row => {
       if (row.children && row.children.length > 0) {
-        // 如果有子项，子项累加
         let childSum = 0;
         row.children.forEach(c => {
           let val = parseFloat(c.cells[idx]);
@@ -515,7 +514,6 @@
         });
         sum += childSum;
       } else {
-        // 没子项，直接算本身
         let val = parseFloat(row.cells[idx]);
         if (!isNaN(val)) sum += val;
       }
@@ -555,7 +553,6 @@
     });
   }
 
-  // ---------- 删除与撤销 ----------
   function deleteRow(index) {
     deletedData = {
       type: 'row',
@@ -570,8 +567,6 @@
     if (state.columns.length <= 1) return alert('至少需要保留一列');
     const colName = state.columns[index];
     const colCells = state.rows.map(row => row.cells[index]);
-    
-    // 子账单数据也要备份与删除
     const childColCells = state.rows.map(row => row.children ? row.children.map(c => c.cells[index]) : []);
 
     deletedData = { type: 'col', index: index, colName: colName, data: colCells, childData: childColCells };
