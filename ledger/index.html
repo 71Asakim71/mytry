@@ -276,9 +276,11 @@
   let state = load();
   let isDeleteMode = false;
   let isDelEmojiMode = false;
-  let deletedRowData = null; // 统一记录删除的父行或子行
+  
+  // 升级为数组，用于保存多次撤销记录
+  let deletedRowDataStack = []; 
   let deletedLedgerData = null; 
-  let deletedEmojiData = null;
+  let deletedEmojiDataStack = [];
 
   function load() {
     try {
@@ -372,10 +374,12 @@
       modeBtn.innerHTML = '🗑️ 删除模式';
       modeBtn.className = 'btn btn-mode-active';
       
-      if (deletedRowData) {
+      if (deletedRowDataStack.length > 0) {
         undoRowBtn.style.display = 'flex';
-        // 根据类型改变撤销按钮文字
-        undoRowBtn.innerHTML = deletedRowData.type === 'parent' ? '↩️ 撤销删大类' : '↩️ 撤销删明细';
+        // 获取最新一次删除的类型和剩余次数
+        const lastAction = deletedRowDataStack[deletedRowDataStack.length - 1];
+        const actionName = lastAction.type === 'parent' ? '删大类' : '删明细';
+        undoRowBtn.innerHTML = `↩️ 撤销${actionName} (${deletedRowDataStack.length})`;
       } else {
         undoRowBtn.style.display = 'none';
       }
@@ -390,7 +394,13 @@
     if (isDelEmojiMode) {
       delEmojiBtn.innerHTML = '✕ 取消删标签';
       delEmojiBtn.className = 'btn btn-mode-active';
-      undoEmojiBtn.style.display = deletedEmojiData ? 'flex' : 'none';
+      
+      if (deletedEmojiDataStack.length > 0) {
+        undoEmojiBtn.style.display = 'flex';
+        undoEmojiBtn.innerHTML = `↩️ 撤销 (${deletedEmojiDataStack.length})`;
+      } else {
+        undoEmojiBtn.style.display = 'none';
+      }
     } else {
       delEmojiBtn.innerHTML = '✕ 删标签';
       delEmojiBtn.className = 'btn btn-danger';
@@ -409,7 +419,10 @@
         chip.innerHTML = `<span>${text}</span><span class="del-x">✕</span>`;
         chip.addEventListener('click', function() {
           if (!confirm(`确定要删除标签【${text}】吗？`)) return;
-          deletedEmojiData = { index: index, text: text };
+          
+          deletedEmojiDataStack.push({ index: index, text: text });
+          if (deletedEmojiDataStack.length > 3) deletedEmojiDataStack.shift(); // 最多保留3次
+          
           state.emojis.splice(index, 1);
           save(); render();
         });
@@ -578,8 +591,10 @@
         delBtn.className = 'action-btn-del';
         delBtn.textContent = '✕';
         delBtn.addEventListener('click', () => {
-          // 记录删除的大类
-          deletedRowData = { type: 'parent', parentIndex: ri, data: JSON.parse(JSON.stringify(row)) };
+          // 记录删除的大类，入栈
+          deletedRowDataStack.push({ type: 'parent', parentIndex: ri, data: JSON.parse(JSON.stringify(row)) });
+          if (deletedRowDataStack.length > 3) deletedRowDataStack.shift(); // 最多保留3步
+          
           ledger.rows.splice(ri, 1);
           save(); render();
         });
@@ -654,8 +669,10 @@
             delChild.className = 'action-btn-del';
             delChild.textContent = '✕';
             delChild.addEventListener('click', () => {
-              // 记录删除的明细，记下它在哪个父行下
-              deletedRowData = { type: 'child', parentIndex: ri, childIndex: cIdx, data: JSON.parse(JSON.stringify(child)) };
+              // 记录删除的明细，入栈
+              deletedRowDataStack.push({ type: 'child', parentIndex: ri, childIndex: cIdx, data: JSON.parse(JSON.stringify(child)) });
+              if (deletedRowDataStack.length > 3) deletedRowDataStack.shift();
+              
               row.children.splice(cIdx, 1);
               if (row.children.length === 0) row.cells[amtIdx] = '';
               save(); render();
@@ -739,13 +756,13 @@
   // ====== 导航事件 ======
   document.getElementById('yearSelect').addEventListener('change', function() {
     state.currentYear = parseInt(this.value);
-    deletedRowData = null; deletedLedgerData = null; 
+    deletedRowDataStack = []; deletedLedgerData = null; 
     save(); render();
   });
 
   document.getElementById('monthSelect').addEventListener('change', function() {
     state.currentMonth = parseInt(this.value);
-    deletedRowData = null; deletedLedgerData = null;
+    deletedRowDataStack = []; deletedLedgerData = null;
     save(); render();
   });
 
@@ -831,41 +848,41 @@
 
   document.getElementById('toggleDelEmojiBtn').addEventListener('click', function() {
     isDelEmojiMode = !isDelEmojiMode;
-    if (!isDelEmojiMode) deletedEmojiData = null; 
+    if (!isDelEmojiMode) deletedEmojiDataStack = []; 
     render(); 
   });
 
   document.getElementById('undoEmojiBtn').addEventListener('click', function() {
-    if (!deletedEmojiData) return;
-    state.emojis.splice(deletedEmojiData.index, 0, deletedEmojiData.text);
-    deletedEmojiData = null;
+    if (deletedEmojiDataStack.length === 0) return;
+    const action = deletedEmojiDataStack.pop();
+    state.emojis.splice(action.index, 0, action.text);
     save(); render();
   });
 
   // ====== 表格事件 ======
   document.getElementById('undoRowBtn').addEventListener('click', function() {
-    if (!deletedRowData) return;
+    if (deletedRowDataStack.length === 0) return;
+    
+    // 从栈顶取出最近一次操作
+    const action = deletedRowDataStack.pop();
     const ledger = getLedger();
     
-    if (deletedRowData.type === 'parent') {
-      // 恢复大类
-      ledger.rows.splice(deletedRowData.parentIndex, 0, deletedRowData.data);
-    } else if (deletedRowData.type === 'child') {
-      // 恢复明细
-      const parentRow = ledger.rows[deletedRowData.parentIndex];
+    if (action.type === 'parent') {
+      ledger.rows.splice(action.parentIndex, 0, action.data);
+    } else if (action.type === 'child') {
+      const parentRow = ledger.rows[action.parentIndex];
       if (parentRow && parentRow.children) {
-        parentRow.children.splice(deletedRowData.childIndex, 0, deletedRowData.data);
-        parentRow.isExpanded = true; // 自动展开父行以便看到恢复的数据
+        parentRow.children.splice(action.childIndex, 0, action.data);
+        parentRow.isExpanded = true;
       }
     }
     
-    deletedRowData = null;
     save(); render();
   });
 
   document.getElementById('toggleModeBtn').addEventListener('click', function() {
     isDeleteMode = !isDeleteMode;
-    if (!isDeleteMode) deletedRowData = null;
+    if (!isDeleteMode) deletedRowDataStack = [];
     render();
   });
 
@@ -889,7 +906,7 @@
   document.getElementById('clearBtn').addEventListener('click', function() {
     if (!confirm('确定清空本账本所有数据吗？此操作不可撤销。')) return;
     state.years[state.currentYear][state.currentMonth] = JSON.parse(JSON.stringify(DEFAULT_LEDGER_DATA));
-    deletedRowData = null;
+    deletedRowDataStack = [];
     save(); render();
   });
 
