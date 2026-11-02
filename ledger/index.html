@@ -47,7 +47,7 @@
     .dropdown-menu {
       display: none; position: absolute; right: 0; top: 100%; margin-top: 0.5rem;
       background: white; border: 1px solid #e6ecf5; border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.08); z-index: 100; min-width: 150px; overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08); z-index: 100; min-width: 160px; overflow: hidden;
     }
     .dropdown-menu.show { display: block; animation: fadeIn 0.15s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
@@ -211,16 +211,17 @@
     .report-total { font-size: 1.2rem; font-weight: 700; color: #1e2b4f; text-align: right; margin-top: 1rem; padding-top: 1rem; border-top: 2px solid #eef2f8;}
 
     /* 导出弹窗专用 */
-    .export-link-btn {
-      display: inline-block; background: #1e2b4f; color: white; text-decoration: none;
-      padding: 0.6rem 1.2rem; border-radius: 12px; font-weight: 600; border: none; cursor: pointer; text-align: center;
+    .export-btn-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+    .export-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: #1e2b4f; color: white; text-decoration: none;
+      padding: 0.8rem; border-radius: 12px; font-weight: 600; border: none; cursor: pointer; width: 100%;
+      transition: opacity 0.2s;
     }
-    .export-link-btn:hover { background: #2a3d6b; }
-    .export-textarea {
-      width: 100%; height: 100px; padding: 10px; margin-top: 10px;
-      border: 1px solid #e6ecf5; border-radius: 8px; background: #f9fbfe;
-      font-family: monospace; font-size: 12px; color: #6b7b9e; resize: none;
-    }
+    .export-btn:active { opacity: 0.8; }
+    .export-btn.secondary { background: #5b8ff9; }
+    .export-btn.outline { background: white; border: 1px solid #e6ecf5; color: #1e2b4f; }
+    .export-tip { font-size: 0.8rem; color: #9aaac9; line-height: 1.5; text-align: left; background: #f9fbfe; padding: 10px; border-radius: 8px;}
 
     /* ===== 手机端适配 ===== */
     @media (max-width: 600px) {
@@ -264,7 +265,7 @@
       <div class="dropdown">
         <button class="btn" id="dataToolBtn">📊 数据工具 ▾</button>
         <div class="dropdown-menu" id="dataToolMenu">
-          <button class="dropdown-item" id="exportCsvBtn">📥 导出 Excel (CSV)</button>
+          <button class="dropdown-item" id="exportDataBtn">📤 导出与备份</button>
           <button class="dropdown-item" id="monthReportBtn">📈 生成月报表</button>
           <button class="dropdown-item" id="yearReportBtn">📅 生成年报表</button>
         </div>
@@ -331,23 +332,27 @@
   </div>
 </div>
 
-<!-- 导出弹窗 -->
+<!-- 导出与备份弹窗 -->
 <div class="modal-overlay" id="exportModal">
-  <div class="modal-content" style="text-align: center;">
-    <div class="modal-header" style="justify-content: center;">
-      <div class="modal-title">📥 导出账本</div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">📤 导出与备份</div>
+      <button class="modal-close" id="closeExportBtn">×</button>
     </div>
-    <p style="color: #6b7b9e; font-size: 0.9rem; margin-bottom: 1rem;">
-      请点击下载文件，或者复制下方文本粘贴到 Excel。
-    </p>
     
-    <!-- 使用 <a> 标签原生下载，最稳定 -->
-    <a id="downloadLink" class="export-link-btn" style="display:block; margin-bottom:10px;">💾 点击下载 CSV 文件</a>
-    <button id="copyCsvBtn" class="export-link-btn" style="background: #5b8ff9; display:block; width:100%;">📋 一键复制表格文本</button>
+    <div class="export-btn-group">
+      <button id="copyTableBtn" class="export-btn">📊 复制为表格 (直接粘贴进 Excel)</button>
+      <button id="copyJsonBtn" class="export-btn secondary">📝 复制纯文本备份 (JSON格式)</button>
+    </div>
     
-    <textarea id="csvTextArea" class="export-textarea" readonly placeholder="数据加载中..."></textarea>
-    
-    <button class="btn" id="closeExportBtn" style="margin-top: 1rem; width:100%; justify-content:center;">关闭</button>
+    <div class="export-tip">
+      <strong>💡 怎么用？</strong><br>
+      1. 点击上方“复制为表格”。<br>
+      2. 打开电脑或手机的 Excel / WPS / 备忘录。<br>
+      3. 找个空白格，直接“粘贴”，表格就完美生成了！<br>
+      <br>
+      <em>（复制 JSON 备份适合保存在备忘录里，以后可以找我帮你恢复数据。）</em>
+    </div>
   </div>
 </div>
 
@@ -1064,92 +1069,134 @@
     }
   });
 
-  // ====== 导出功能 ======
+  // ====== 导出与备份功能 ======
   const exportModal = document.getElementById('exportModal');
   const closeExportBtn = document.getElementById('closeExportBtn');
-  const downloadLink = document.getElementById('downloadLink');
-  const csvTextArea = document.getElementById('csvTextArea');
-  const copyCsvBtn = document.getElementById('copyCsvBtn');
+  const copyTableBtn = document.getElementById('copyTableBtn');
+  const copyJsonBtn = document.getElementById('copyJsonBtn');
 
-  function closeExport() {
-    exportModal.classList.remove('show');
-    if (downloadLink.href.startsWith('blob:')) {
-      URL.revokeObjectURL(downloadLink.href);
-    }
-    downloadLink.href = 'javascript:void(0);';
-  }
-
-  closeExportBtn.addEventListener('click', closeExport);
+  closeExportBtn.addEventListener('click', () => exportModal.classList.remove('show'));
   exportModal.addEventListener('click', (e) => {
-    if (e.target === exportModal) closeExport();
+    if (e.target === exportModal) exportModal.classList.remove('show');
   });
 
-  copyCsvBtn.addEventListener('click', function() {
-    csvTextArea.select();
-    csvTextArea.setSelectionRange(0, 99999);
-    
-    // 优先使用现代 API
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(csvTextArea.value).then(() => {
-        this.textContent = '✅ 复制成功';
-        setTimeout(() => { this.textContent = '📋 一键复制表格文本'; }, 2000);
-      }).catch(() => {
-        // 降级处理
-        document.execCommand('copy');
-        this.textContent = '✅ 复制成功';
-        setTimeout(() => { this.textContent = '📋 一键复制表格文本'; }, 2000);
-      });
-    } else {
-      // 兼容老浏览器
-      const successful = document.execCommand('copy');
-      if (successful) {
-        this.textContent = '✅ 复制成功';
-        setTimeout(() => { this.textContent = '📋 一键复制表格文本'; }, 2000);
-      } else {
-        alert('复制失败，请长按文本框手动选择复制');
-      }
-    }
-  });
-
-  document.getElementById('exportCsvBtn').addEventListener('click', function() {
-    dataToolMenu.classList.remove('show');
+  // 复制为 HTML 表格 (粘贴到 Excel)
+  copyTableBtn.addEventListener('click', function() {
     const ledger = getLedger();
     const amtIdx = amountColumnIndex(ledger);
     
-    let csvContent = "";
-    csvContent += ledger.columns.join(",") + "\n";
+    // 生成 HTML 表格，带上必要的样式，方便直接粘贴到 Excel 中
+    let html = '<table border="1" style="border-collapse: collapse; text-align: left;">';
+    // 表头
+    html += '<tr>';
+    ledger.columns.forEach(col => { html += `<th style="padding: 5px; background-color: #f0f0f0;">${col}</th>`; });
+    html += '</tr>';
     
+    // 数据行
     ledger.rows.forEach(row => {
       const parentCells = [...row.cells];
       if (row.children && row.children.length > 0) {
         parentCells[amtIdx] = getRowAmount(row, amtIdx);
       }
-      csvContent += parentCells.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(",") + "\n";
+      
+      // 父行
+      html += '<tr>';
+      parentCells.forEach(c => { html += `<td style="padding: 5px;">${c || ''}</td>`; });
+      html += '</tr>';
+      
+      // 子行
       if (row.children && row.children.length > 0) {
         row.children.forEach(child => {
-          const childCells = [...child.cells];
-          childCells[0] = "  └ " + (childCells[0] || '');
-          csvContent += childCells.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(",") + "\n";
+          html += '<tr>';
+          child.cells.forEach((c, i) => { 
+            let text = c || '';
+            if (i === 0) text = "└ " + text; // 加个前缀标识
+            html += `<td style="padding: 5px; color: #666;">${text}</td>`; 
+          });
+          html += '</tr>';
         });
       }
     });
+    html += '</table>';
 
-    csvTextArea.value = csvContent;
-    const fileName = `Asakim账本_${state.currentYear}年${state.currentMonth}月.csv`;
+    // 核心：同时向剪贴板写入 text/html 和 text/plain，这样粘贴到 Excel 就是表格，粘贴到 txt 就是纯文本
+    const textVersion = ledger.columns.join('\t') + '\n' + 
+      ledger.rows.map(r => r.cells.join('\t')).join('\n');
 
     try {
-      const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
+      const clipboardItem = new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([textVersion], { type: 'text/plain' })
+      });
       
-      downloadLink.href = url;
-      downloadLink.download = fileName;
-      // 如果浏览器支持download属性，尝试在这里直接触发下载，有些手机端不支持a标签的自动点击，所以保留真实按钮
-    } catch (e) {
-      console.warn("Blob failed, falling back to data URI");
-      downloadLink.href = "data:text/csv;charset=utf-8,\uFEFF" + encodeURIComponent(csvContent);
-      downloadLink.download = fileName;
+      navigator.clipboard.write([clipboardItem]).then(() => {
+        this.textContent = '✅ 已复制！去 Excel 粘贴吧';
+        setTimeout(() => { this.textContent = '📊 复制为表格 (直接粘贴进 Excel)'; exportModal.classList.remove('show'); }, 2000);
+      }).catch(err => {
+        fallbackCopy(html);
+      });
+    } catch (err) {
+      fallbackCopy(html);
     }
-    
+
+    function fallbackCopy(htmlStr) {
+      // 针对不支持 ClipboardItem 的老浏览器
+      const el = document.createElement('div');
+      el.innerHTML = htmlStr;
+      el.style.position = 'fixed';
+      el.style.left = '-9999px';
+      document.body.appendChild(el);
+      
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      
+      try {
+        document.execCommand('copy');
+        this.textContent = '✅ 已复制！去 Excel 粘贴吧';
+        setTimeout(() => { this.textContent = '📊 复制为表格 (直接粘贴进 Excel)'; exportModal.classList.remove('show'); }, 2000);
+      } catch (e) {
+        alert('复制失败，请检查浏览器权限');
+      }
+      
+      document.body.removeChild(el);
+    }
+  });
+
+  // 复制 JSON 备份
+  copyJsonBtn.addEventListener('click', function() {
+    const jsonStr = JSON.stringify(state);
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(jsonStr).then(() => {
+        this.textContent = '✅ JSON 备份已复制到剪贴板';
+        setTimeout(() => { this.textContent = '📝 复制纯文本备份 (JSON格式)'; exportModal.classList.remove('show'); }, 2000);
+      }).catch(() => {
+        fallbackCopyText(jsonStr);
+      });
+    } else {
+      fallbackCopyText(jsonStr);
+    }
+
+    function fallbackCopyText(text) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        this.textContent = '✅ JSON 备份已复制到剪贴板';
+        setTimeout(() => { this.textContent = '📝 复制纯文本备份 (JSON格式)'; exportModal.classList.remove('show'); }, 2000);
+      } catch (err) {
+        alert("复制失败，请手动选择复制");
+      }
+      document.body.removeChild(textArea);
+    }
+  });
+
+  document.getElementById('exportDataBtn').addEventListener('click', function() {
+    dataToolMenu.classList.remove('show');
     exportModal.classList.add('show');
   });
 
@@ -1165,11 +1212,8 @@
     if (e.target === reportModal) reportModal.classList.remove('show');
   });
 
-  // 辅助函数：生成 CSS 图表 HTML
   function generateCSSChart(dataArray) {
     if (dataArray.length === 0) return '';
-    
-    // 找出最大值，用于计算百分比宽度
     const maxVal = Math.max(...dataArray.map(item => item.value));
     if (maxVal === 0) return '';
 
@@ -1177,7 +1221,6 @@
     dataArray.forEach((item, index) => {
       const percent = (item.value / maxVal) * 100;
       const color = COLORS[index % COLORS.length];
-      
       html += `
         <div class="chart-row">
           <div class="chart-label">
@@ -1193,7 +1236,6 @@
     return html;
   }
 
-  // 生成月报表
   document.getElementById('monthReportBtn').addEventListener('click', function() {
     dataToolMenu.classList.remove('show');
     const ledger = getLedger();
@@ -1218,11 +1260,9 @@
     const sortedCats = Object.entries(catSummary).sort((a, b) => b[1] - a[1]);
     modalTitle.textContent = `📈 ${state.currentYear}年${state.currentMonth}月 报表`;
 
-    // 图表数据准备
     const chartData = sortedCats.map(item => ({ label: item[0], value: item[1] }));
     cssChartContainer.innerHTML = generateCSSChart(chartData);
 
-    // 列表数据准备
     let html = '';
     if (sortedCats.length === 0) {
       html = '<div style="text-align:center; color:#9aaac9; padding: 2rem 0;">本月暂无数据</div>';
@@ -1237,7 +1277,6 @@
     reportModal.classList.add('show');
   });
 
-  // 生成年报表
   document.getElementById('yearReportBtn').addEventListener('click', function() {
     dataToolMenu.classList.remove('show');
     const y = state.currentYear;
@@ -1261,14 +1300,12 @@
 
     modalTitle.textContent = `📅 ${y}年 报表`;
 
-    // 图表数据准备（过滤掉没有金额的月份，让图更紧凑好看）
     const chartData = monthSummary
       .filter(item => item.amount > 0)
       .map(item => ({ label: `${item.month} 月`, value: item.amount }));
       
     cssChartContainer.innerHTML = generateCSSChart(chartData);
 
-    // 列表数据准备
     let html = '';
     const activeMonths = monthSummary.filter(item => item.amount > 0);
     if (activeMonths.length === 0) {
