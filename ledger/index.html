@@ -275,10 +275,10 @@
 
   let state = load();
   let isDeleteMode = false;
-  let isDelEmojiMode = false; // 标签删除模式
-  let deletedRowData = null;
+  let isDelEmojiMode = false;
+  let deletedRowData = null; // 统一记录删除的父行或子行
   let deletedLedgerData = null; 
-  let deletedEmojiData = null; // 记录删除的标签
+  let deletedEmojiData = null;
 
   function load() {
     try {
@@ -286,13 +286,12 @@
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed.currentYear && parsed.years) {
-          if (!parsed.emojis) parsed.emojis = [...DEFAULT_EMOJIS]; // 兼容老数据
+          if (!parsed.emojis) parsed.emojis = [...DEFAULT_EMOJIS];
           return parsed;
         }
       }
     } catch (e) {}
     
-    // 兼容旧版数据
     try {
       const oldRaw = localStorage.getItem('asakim_ledger_v2');
       if (oldRaw) {
@@ -364,13 +363,22 @@
     document.getElementById('undoLedgerBtn').style.display = deletedLedgerData ? 'inline-block' : 'none';
   }
 
+  // ===== 更新工具栏状态 =====
   function updateToolbar() {
     const modeBtn = document.getElementById('toggleModeBtn');
     const undoRowBtn = document.getElementById('undoRowBtn');
+    
     if (isDeleteMode) {
       modeBtn.innerHTML = '🗑️ 删除模式';
       modeBtn.className = 'btn btn-mode-active';
-      undoRowBtn.style.display = deletedRowData ? 'flex' : 'none';
+      
+      if (deletedRowData) {
+        undoRowBtn.style.display = 'flex';
+        // 根据类型改变撤销按钮文字
+        undoRowBtn.innerHTML = deletedRowData.type === 'parent' ? '↩️ 撤销删大类' : '↩️ 撤销删明细';
+      } else {
+        undoRowBtn.style.display = 'none';
+      }
     } else {
       modeBtn.innerHTML = '✏️ 记账模式';
       modeBtn.className = 'btn btn-edit-active';
@@ -390,7 +398,6 @@
     }
   }
 
-  // ===== 渲染 Emoji 面板 =====
   function renderEmojiPanel() {
     const panel = document.getElementById('emojiPanel');
     panel.innerHTML = '';
@@ -400,7 +407,6 @@
       
       if (isDelEmojiMode) {
         chip.innerHTML = `<span>${text}</span><span class="del-x">✕</span>`;
-        chip.title = '点击删除此标签';
         chip.addEventListener('click', function() {
           if (!confirm(`确定要删除标签【${text}】吗？`)) return;
           deletedEmojiData = { index: index, text: text };
@@ -435,7 +441,6 @@
     });
   }
 
-  // ===== 表头渲染 =====
   function renderHead() {
     const ledger = getLedger();
     const thead = document.getElementById('tableHead');
@@ -495,7 +500,6 @@
     thead.appendChild(tr);
   }
 
-  // ===== 主体渲染 =====
   function renderBody() {
     const ledger = getLedger();
     const tbody = document.getElementById('tableBody');
@@ -574,7 +578,8 @@
         delBtn.className = 'action-btn-del';
         delBtn.textContent = '✕';
         delBtn.addEventListener('click', () => {
-          deletedRowData = { index: ri, data: JSON.parse(JSON.stringify(row)) };
+          // 记录删除的大类
+          deletedRowData = { type: 'parent', parentIndex: ri, data: JSON.parse(JSON.stringify(row)) };
           ledger.rows.splice(ri, 1);
           save(); render();
         });
@@ -649,6 +654,8 @@
             delChild.className = 'action-btn-del';
             delChild.textContent = '✕';
             delChild.addEventListener('click', () => {
+              // 记录删除的明细，记下它在哪个父行下
+              deletedRowData = { type: 'child', parentIndex: ri, childIndex: cIdx, data: JSON.parse(JSON.stringify(child)) };
               row.children.splice(cIdx, 1);
               if (row.children.length === 0) row.cells[amtIdx] = '';
               save(); render();
@@ -824,7 +831,7 @@
 
   document.getElementById('toggleDelEmojiBtn').addEventListener('click', function() {
     isDelEmojiMode = !isDelEmojiMode;
-    if (!isDelEmojiMode) deletedEmojiData = null; // 退出时清空撤销记录
+    if (!isDelEmojiMode) deletedEmojiData = null; 
     render(); 
   });
 
@@ -838,7 +845,20 @@
   // ====== 表格事件 ======
   document.getElementById('undoRowBtn').addEventListener('click', function() {
     if (!deletedRowData) return;
-    getLedger().rows.splice(deletedRowData.index, 0, deletedRowData.data);
+    const ledger = getLedger();
+    
+    if (deletedRowData.type === 'parent') {
+      // 恢复大类
+      ledger.rows.splice(deletedRowData.parentIndex, 0, deletedRowData.data);
+    } else if (deletedRowData.type === 'child') {
+      // 恢复明细
+      const parentRow = ledger.rows[deletedRowData.parentIndex];
+      if (parentRow && parentRow.children) {
+        parentRow.children.splice(deletedRowData.childIndex, 0, deletedRowData.data);
+        parentRow.isExpanded = true; // 自动展开父行以便看到恢复的数据
+      }
+    }
+    
     deletedRowData = null;
     save(); render();
   });
