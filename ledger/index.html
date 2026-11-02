@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>极简记账 · Asakim</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -197,12 +196,13 @@
     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
     .modal-title { font-size: 1.2rem; font-weight: 700; }
     .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #9aaac9; }
-    
-    /* 图表容器 */
-    .chart-container {
-      position: relative; width: 100%; height: 250px; margin-bottom: 1.5rem;
-      display: flex; justify-content: center;
-    }
+
+    /* ===== 原生 CSS 图表样式 ===== */
+    .css-chart { margin-bottom: 1.5rem; }
+    .chart-row { margin-bottom: 0.8rem; }
+    .chart-label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.3rem; color: #1e2b4f;}
+    .chart-track { background: #f0f4fb; height: 12px; border-radius: 6px; overflow: hidden; }
+    .chart-fill { height: 100%; border-radius: 6px; transition: width 0.5s ease-out; }
 
     /* 报表明细列表 */
     .report-list-title { font-size: 0.9rem; color: #6b7b9e; margin-bottom: 0.5rem; border-bottom: 1px dashed #eef2f8; padding-bottom: 0.5rem;}
@@ -213,7 +213,7 @@
     /* 导出弹窗专用 */
     .export-link-btn {
       display: inline-block; background: #1e2b4f; color: white; text-decoration: none;
-      padding: 0.6rem 1.2rem; border-radius: 12px; font-weight: 600; border: none; cursor: pointer;
+      padding: 0.6rem 1.2rem; border-radius: 12px; font-weight: 600; border: none; cursor: pointer; text-align: center;
     }
     .export-link-btn:hover { background: #2a3d6b; }
     .export-textarea {
@@ -239,8 +239,6 @@
       }
       th:first-child { z-index: 3; }
       .child-row td:first-child { background: #fafbfc; }
-      
-      .chart-container { height: 220px; }
     }
   </style>
 </head>
@@ -324,9 +322,10 @@
       <div class="modal-title" id="modalTitle">报表</div>
       <button class="modal-close" id="closeModalBtn">×</button>
     </div>
-    <div class="chart-container">
-      <canvas id="reportChart"></canvas>
-    </div>
+    
+    <!-- 纯 CSS 图表渲染区 -->
+    <div id="cssChartContainer" class="css-chart"></div>
+    
     <div class="report-list-title">详细数据</div>
     <div id="reportBody"></div>
   </div>
@@ -339,23 +338,28 @@
       <div class="modal-title">📥 导出账本</div>
     </div>
     <p style="color: #6b7b9e; font-size: 0.9rem; margin-bottom: 1rem;">
-      请尝试点击下载，或者直接复制下方文本粘贴到 Excel。
+      请点击下载文件，或者复制下方文本粘贴到 Excel。
     </p>
-    <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 1rem;">
-      <a id="downloadLink" class="export-link-btn" href="#">点击下载文件</a>
-      <button id="copyCsvBtn" class="export-link-btn" style="background: #5b8ff9;">一键复制文本</button>
-    </div>
     
-    <textarea id="csvTextArea" class="export-textarea" readonly></textarea>
+    <!-- 使用 <a> 标签原生下载，最稳定 -->
+    <a id="downloadLink" class="export-link-btn" style="display:block; margin-bottom:10px;">💾 点击下载 CSV 文件</a>
+    <button id="copyCsvBtn" class="export-link-btn" style="background: #5b8ff9; display:block; width:100%;">📋 一键复制表格文本</button>
     
-    <button class="btn" id="closeExportBtn" style="margin-top: 1rem;">关闭</button>
+    <textarea id="csvTextArea" class="export-textarea" readonly placeholder="数据加载中..."></textarea>
+    
+    <button class="btn" id="closeExportBtn" style="margin-top: 1rem; width:100%; justify-content:center;">关闭</button>
   </div>
 </div>
 
 <script>
 (function() {
   const STORAGE_KEY = 'asakim_ledger_v3';
-  let myChart = null; 
+  
+  // 莫兰迪色系，用于图表
+  const COLORS = [
+    '#5b8ff9', '#5ad8a6', '#5d7092', '#f6bd16', '#e8684a',
+    '#6dc8ec', '#9270ca', '#ff9d4d', '#269a99', '#ff99c3'
+  ];
 
   const DEFAULT_LEDGER_DATA = {
     columns: ['日期', '分类', '名称', '金额'],
@@ -1050,23 +1054,15 @@
     dataToolMenu.classList.toggle('show');
   });
 
-  // 关键修复：阻止菜单内的点击事件冒泡到 document，避免菜单提前关闭
   dataToolMenu.addEventListener('click', function(e) {
     e.stopPropagation(); 
   });
 
-  // 点击外部关闭菜单
   document.addEventListener('click', function(e) {
     if (!dataToolMenu.contains(e.target) && e.target !== dataToolBtn) {
       dataToolMenu.classList.remove('show');
     }
   });
-
-  // 生成随机莫兰迪色系，保证图表好看
-  const CHART_COLORS = [
-    '#5b8ff9', '#5ad8a6', '#5d7092', '#f6bd16', '#e8684a',
-    '#6dc8ec', '#9270ca', '#ff9d4d', '#269a99', '#ff99c3'
-  ];
 
   // ====== 导出功能 ======
   const exportModal = document.getElementById('exportModal');
@@ -1080,7 +1076,7 @@
     if (downloadLink.href.startsWith('blob:')) {
       URL.revokeObjectURL(downloadLink.href);
     }
-    downloadLink.href = '#';
+    downloadLink.href = 'javascript:void(0);';
   }
 
   closeExportBtn.addEventListener('click', closeExport);
@@ -1088,20 +1084,30 @@
     if (e.target === exportModal) closeExport();
   });
 
-  // 一键复制
   copyCsvBtn.addEventListener('click', function() {
     csvTextArea.select();
-    csvTextArea.setSelectionRange(0, 99999); // 适配手机
-    try {
+    csvTextArea.setSelectionRange(0, 99999);
+    
+    // 优先使用现代 API
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(csvTextArea.value).then(() => {
+        this.textContent = '✅ 复制成功';
+        setTimeout(() => { this.textContent = '📋 一键复制表格文本'; }, 2000);
+      }).catch(() => {
+        // 降级处理
+        document.execCommand('copy');
+        this.textContent = '✅ 复制成功';
+        setTimeout(() => { this.textContent = '📋 一键复制表格文本'; }, 2000);
+      });
+    } else {
+      // 兼容老浏览器
       const successful = document.execCommand('copy');
       if (successful) {
         this.textContent = '✅ 复制成功';
-        setTimeout(() => { this.textContent = '一键复制文本'; }, 2000);
+        setTimeout(() => { this.textContent = '📋 一键复制表格文本'; }, 2000);
       } else {
-        alert('复制失败，请长按文本框手动复制');
+        alert('复制失败，请长按文本框手动选择复制');
       }
-    } catch (err) {
-      alert('复制失败，请长按文本框手动复制');
     }
   });
 
@@ -1128,36 +1134,66 @@
       }
     });
 
-    // 填入文本框供复制
     csvTextArea.value = csvContent;
+    const fileName = `Asakim账本_${state.currentYear}年${state.currentMonth}月.csv`;
 
-    // 生成 Blob 链接供下载
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    downloadLink.href = url;
-    downloadLink.download = `Asakim账本_${state.currentYear}年${state.currentMonth}月.csv`;
+    try {
+      const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      
+      downloadLink.href = url;
+      downloadLink.download = fileName;
+      // 如果浏览器支持download属性，尝试在这里直接触发下载，有些手机端不支持a标签的自动点击，所以保留真实按钮
+    } catch (e) {
+      console.warn("Blob failed, falling back to data URI");
+      downloadLink.href = "data:text/csv;charset=utf-8,\uFEFF" + encodeURIComponent(csvContent);
+      downloadLink.download = fileName;
+    }
     
     exportModal.classList.add('show');
   });
 
-  // ====== 报表弹窗相关 ======
+  // ====== 报表渲染（纯 CSS 极简图表） ======
   const reportModal = document.getElementById('reportModal');
   const closeModalBtn = document.getElementById('closeModalBtn');
   const reportBody = document.getElementById('reportBody');
   const modalTitle = document.getElementById('modalTitle');
-  const ctx = document.getElementById('reportChart').getContext('2d');
+  const cssChartContainer = document.getElementById('cssChartContainer');
 
-  closeModalBtn.addEventListener('click', () => { 
-    reportModal.classList.remove('show'); 
-    if(myChart) myChart.destroy();
-  });
+  closeModalBtn.addEventListener('click', () => { reportModal.classList.remove('show'); });
   reportModal.addEventListener('click', (e) => { 
-    if (e.target === reportModal) {
-      reportModal.classList.remove('show');
-      if(myChart) myChart.destroy();
-    }
+    if (e.target === reportModal) reportModal.classList.remove('show');
   });
 
+  // 辅助函数：生成 CSS 图表 HTML
+  function generateCSSChart(dataArray) {
+    if (dataArray.length === 0) return '';
+    
+    // 找出最大值，用于计算百分比宽度
+    const maxVal = Math.max(...dataArray.map(item => item.value));
+    if (maxVal === 0) return '';
+
+    let html = '';
+    dataArray.forEach((item, index) => {
+      const percent = (item.value / maxVal) * 100;
+      const color = COLORS[index % COLORS.length];
+      
+      html += `
+        <div class="chart-row">
+          <div class="chart-label">
+            <span>${item.label}</span>
+            <span>¥ ${item.value % 1 === 0 ? item.value : item.value.toFixed(2)}</span>
+          </div>
+          <div class="chart-track">
+            <div class="chart-fill" style="width: ${percent}%; background-color: ${color};"></div>
+          </div>
+        </div>
+      `;
+    });
+    return html;
+  }
+
+  // 生成月报表
   document.getElementById('monthReportBtn').addEventListener('click', function() {
     dataToolMenu.classList.remove('show');
     const ledger = getLedger();
@@ -1180,32 +1216,13 @@
     });
 
     const sortedCats = Object.entries(catSummary).sort((a, b) => b[1] - a[1]);
-
     modalTitle.textContent = `📈 ${state.currentYear}年${state.currentMonth}月 报表`;
-    
-    if (myChart) myChart.destroy();
-    if (sortedCats.length > 0) {
-      myChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: sortedCats.map(item => item[0]),
-          datasets: [{
-            data: sortedCats.map(item => item[1]),
-            backgroundColor: CHART_COLORS,
-            borderWidth: 2,
-            borderColor: '#ffffff'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'right', labels: { boxWidth: 12, font: {size: 11} } }
-          }
-        }
-      });
-    }
 
+    // 图表数据准备
+    const chartData = sortedCats.map(item => ({ label: item[0], value: item[1] }));
+    cssChartContainer.innerHTML = generateCSSChart(chartData);
+
+    // 列表数据准备
     let html = '';
     if (sortedCats.length === 0) {
       html = '<div style="text-align:center; color:#9aaac9; padding: 2rem 0;">本月暂无数据</div>';
@@ -1216,9 +1233,11 @@
       html += `<div class="report-total">总计：¥ ${total % 1 === 0 ? total : total.toFixed(2)}</div>`;
     }
     reportBody.innerHTML = html;
+    
     reportModal.classList.add('show');
   });
 
+  // 生成年报表
   document.getElementById('yearReportBtn').addEventListener('click', function() {
     dataToolMenu.classList.remove('show');
     const y = state.currentYear;
@@ -1241,32 +1260,15 @@
     }
 
     modalTitle.textContent = `📅 ${y}年 报表`;
-    
-    if (myChart) myChart.destroy();
-    myChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: monthSummary.map(item => `${item.month}月`),
-        datasets: [{
-          label: '月度开销',
-          data: monthSummary.map(item => item.amount),
-          backgroundColor: '#5b8ff9',
-          borderRadius: 4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false }
-        },
-        scales: {
-          y: { beginAtZero: true, grid: { color: '#f5f7fb' } },
-          x: { grid: { display: false } }
-        }
-      }
-    });
 
+    // 图表数据准备（过滤掉没有金额的月份，让图更紧凑好看）
+    const chartData = monthSummary
+      .filter(item => item.amount > 0)
+      .map(item => ({ label: `${item.month} 月`, value: item.amount }));
+      
+    cssChartContainer.innerHTML = generateCSSChart(chartData);
+
+    // 列表数据准备
     let html = '';
     const activeMonths = monthSummary.filter(item => item.amount > 0);
     if (activeMonths.length === 0) {
@@ -1278,6 +1280,7 @@
       html += `<div class="report-total">全年总计：¥ ${yearTotal % 1 === 0 ? yearTotal : yearTotal.toFixed(2)}</div>`;
     }
     reportBody.innerHTML = html;
+    
     reportModal.classList.add('show');
   });
 
