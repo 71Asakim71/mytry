@@ -36,7 +36,7 @@
       border: 1px solid #e6ecf5; background: #f9fbfe; color: #1e2b4f;
       border-radius: 12px; padding: 0.45rem 0.9rem; font-size: 0.85rem;
       cursor: pointer; transition: all 0.2s ease; font-family: inherit;
-      display: flex; align-items: center; gap: 0.3rem;
+      display: flex; align-items: center; gap: 0.3rem; white-space: nowrap;
     }
     .btn:hover { background: #edf2fa; border-color: #b7c9e8; }
     .btn-primary { background: #1e2b4f; color: white; border-color: #1e2b4f; }
@@ -56,52 +56,50 @@
     }
     .emoji-chip:hover { background: #edf2fa; border-color: #b7c9e8; }
 
-    /* 表格 */
+    /* 表格布局 */
     .table-wrap { overflow-x: auto; margin-bottom: 1rem; -webkit-overflow-scrolling: touch; }
-    table { width: 100%; border-collapse: collapse; }
+    table { width: 100%; border-collapse: collapse; table-layout: auto; }
     
     th, td { 
-      padding: 0.4rem 0.2rem; 
+      padding: 0.6rem 0.4rem; 
       border-bottom: 1px solid #eef2f8; 
       text-align: left; 
-      vertical-align: top; 
-      font-size: 0.85rem; 
-      max-width: 90px; /* 限制最大宽度 */
-      word-break: break-all; 
+      vertical-align: middle; /* 改为垂直居中，视觉更整齐 */
+      font-size: 0.9rem; 
+      word-break: break-word; /* 替换 break-all，避免英文单词被强行切断 */
       position: relative;
+      min-width: 50px; /* 保证最小宽度 */
     }
     
     th { 
       font-weight: 600; 
-      font-size: 0.8rem; 
+      font-size: 0.85rem; 
       color: #6b7b9e; 
-      padding-bottom: 0.5rem; 
+      padding-bottom: 0.6rem; 
     }
     
     /* 单元格 */
     td[contenteditable="true"] {
       outline: none; border-radius: 8px; transition: background 0.15s ease;
-      min-width: 40px; 
       padding: 4px;
     }
     td[contenteditable="true"]:focus { background: #f0f4fb; }
-    /* 在删除模式下，禁用编辑指针和背景 */
     td[contenteditable="false"] { cursor: default; }
     
-    /* 操作列 */
-    .action-col { width: 32px; padding: 4px 0; text-align: center; }
+    /* 操作列 (最右侧的颜色/删除) */
+    .action-col { width: 44px; padding: 4px 0; text-align: center; }
     .cell-tools { display: flex; flex-direction: column; gap: 0.4rem; align-items: center; justify-content: center; }
     
-    /* 普通模式下的颜色圆点 */
+    /* 颜色选择器 */
     .color-input {
       -webkit-appearance: none; 
-      width: 20px; height: 20px; 
+      width: 22px; height: 22px; 
       border: none;
-      border-radius: 50%; /* 改为圆形 */
+      border-radius: 50%;
       padding: 0; 
       cursor: pointer; 
       overflow: hidden;
-      box-shadow: 0 0 0 1px #e6ecf5; /* 用阴影替代边框更圆润 */
+      box-shadow: 0 0 0 1px #e6ecf5;
     }
     .color-input::-webkit-color-swatch-wrapper { padding: 0; }
     .color-input::-webkit-color-swatch { border: none; border-radius: 50%; }
@@ -114,12 +112,13 @@
     }
     .action-btn-del:hover { background: #fdf0ef; }
 
-    /* 删除模式下的表头列删除按钮 */
+    /* 删除模式下的表头列删除按钮（关键修复：去掉绝对定位，不再重叠） */
     .col-del-btn {
-      position: absolute;
-      top: 0; right: 0;
       color: #c0392b; background: #fdf0ef; border: none; border-radius: 4px;
-      font-size: 0.7rem; cursor: pointer; padding: 2px 4px;
+      font-size: 0.7rem; cursor: pointer; padding: 2px 5px;
+      margin-left: 4px;
+      vertical-align: middle;
+      display: inline-block;
     }
 
     /* 总计 */
@@ -130,6 +129,29 @@
     .total-amount { font-size: 1.4rem; font-weight: 700; color: #1e2b4f; }
     .empty-hint { color: #9aaac9; font-size: 0.9rem; text-align: center; padding: 2rem 0; }
     footer { text-align: center; margin-top: 2rem; color: #9aaac9; font-size: 0.85rem; }
+
+    /* ===== 手机端专属适配 ===== */
+    @media (max-width: 600px) {
+      body { padding: 1rem 0.5rem; }
+      .card { padding: 1rem; border-radius: 16px; }
+      
+      /* 工具栏：去掉多余占位，让按钮更紧凑 */
+      .toolbar > span[style*="flex:1"] { display: none; }
+      .toolbar { gap: 0.4rem; }
+      .btn { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
+      
+      th, td { padding: 0.5rem 0.3rem; font-size: 0.85rem; }
+      
+      /* 让第一列（日期）在横向滑动时固定 */
+      th:first-child, td:first-child {
+        position: sticky;
+        left: 0;
+        background: white;
+        z-index: 2;
+        box-shadow: 2px 0 4px -2px rgba(0,0,0,0.05);
+      }
+      th:first-child { z-index: 3; }
+    }
   </style>
 </head>
 <body>
@@ -287,7 +309,8 @@
         colDelBtn.className = 'col-del-btn';
         colDelBtn.textContent = '✕';
         colDelBtn.title = '删除此列';
-        colDelBtn.addEventListener('click', function() {
+        colDelBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
           deleteColumn(ci);
         });
         th.appendChild(colDelBtn);
