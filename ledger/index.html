@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>极简记账 · Asakim</title>
+  <!-- 引入 Chart.js 用于生成图表 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -33,7 +35,7 @@
 
     /* 账本导航栏 */
     .ledger-nav {
-      display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;
+      display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; position: relative;
     }
     .select-box {
       border: 1px solid #e6ecf5; background: #f9fbfe; border-radius: 12px;
@@ -41,6 +43,22 @@
       color: #1e2b4f; outline: none; cursor: pointer; transition: all 0.2s;
     }
     .select-box:hover { background: #edf2fa; border-color: #b7c9e8; }
+
+    /* 数据下拉菜单 */
+    .dropdown { position: relative; display: inline-block; margin-left: auto; }
+    .dropdown-menu {
+      display: none; position: absolute; right: 0; top: 100%; margin-top: 0.5rem;
+      background: white; border: 1px solid #e6ecf5; border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08); z-index: 100; min-width: 150px; overflow: hidden;
+    }
+    .dropdown-menu.show { display: block; animation: fadeIn 0.15s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    .dropdown-item {
+      display: block; width: 100%; padding: 0.7rem 1rem; text-align: left;
+      border: none; background: transparent; cursor: pointer; font-family: inherit;
+      font-size: 0.85rem; color: #1e2b4f; transition: background 0.2s;
+    }
+    .dropdown-item:hover { background: #f5f7fb; }
 
     /* 工具栏 */
     .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; align-items: center; }
@@ -164,6 +182,35 @@
     .empty-hint { color: #9aaac9; font-size: 0.9rem; text-align: center; padding: 2rem 0; }
     footer { text-align: center; margin-top: 2rem; color: #9aaac9; font-size: 0.85rem; }
 
+    /* ===== 报表弹窗 ===== */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(30, 43, 79, 0.4); backdrop-filter: blur(2px);
+      display: none; justify-content: center; align-items: center; z-index: 1000;
+      padding: 1rem;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-content {
+      background: white; border-radius: 20px; padding: 1.5rem;
+      width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .modal-title { font-size: 1.2rem; font-weight: 700; }
+    .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #9aaac9; }
+    
+    /* 图表容器 */
+    .chart-container {
+      position: relative; width: 100%; height: 250px; margin-bottom: 1.5rem;
+      display: flex; justify-content: center;
+    }
+
+    /* 报表明细列表 */
+    .report-list-title { font-size: 0.9rem; color: #6b7b9e; margin-bottom: 0.5rem; border-bottom: 1px dashed #eef2f8; padding-bottom: 0.5rem;}
+    .report-item { display: flex; justify-content: space-between; padding: 0.6rem 0; border-bottom: 1px solid #f5f7fb; font-size: 0.9rem;}
+    .report-item:last-child { border-bottom: none; }
+    .report-total { font-size: 1.2rem; font-weight: 700; color: #1e2b4f; text-align: right; margin-top: 1rem; padding-top: 1rem; border-top: 2px solid #eef2f8;}
+
     /* ===== 手机端适配 ===== */
     @media (max-width: 600px) {
       body { padding: 1rem 0.5rem; }
@@ -181,6 +228,8 @@
       }
       th:first-child { z-index: 3; }
       .child-row td:first-child { background: #fafbfc; }
+      
+      .chart-container { height: 220px; }
     }
   </style>
 </head>
@@ -202,7 +251,17 @@
       <button class="btn" id="addMonthBtn">＋ 月</button>
       <button class="btn btn-danger" id="delMonthBtn">✕ 删月</button>
       
-      <button class="btn" id="undoLedgerBtn" style="display:none; margin-left: auto; color: #c0392b; background: #fdf0ef;">↩️ 撤销删账本</button>
+      <!-- 数据工具下拉菜单 -->
+      <div class="dropdown">
+        <button class="btn" id="dataToolBtn">📊 数据工具 ▾</button>
+        <div class="dropdown-menu" id="dataToolMenu">
+          <button class="dropdown-item" id="exportCsvBtn">📥 导出 Excel (CSV)</button>
+          <button class="dropdown-item" id="monthReportBtn">📈 生成月报表</button>
+          <button class="dropdown-item" id="yearReportBtn">📅 生成年报表</button>
+        </div>
+      </div>
+
+      <button class="btn" id="undoLedgerBtn" style="display:none; margin-left: 10px; color: #c0392b; background: #fdf0ef;">↩️ 撤销删账本</button>
     </div>
   </div>
 
@@ -247,9 +306,27 @@
   <footer>数据保存在本机浏览器中 · Asakim 工具箱</footer>
 </div>
 
+<!-- 报表弹窗 -->
+<div class="modal-overlay" id="reportModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">报表</div>
+      <button class="modal-close" id="closeModalBtn">×</button>
+    </div>
+    <!-- 图表容器 -->
+    <div class="chart-container">
+      <canvas id="reportChart"></canvas>
+    </div>
+    <!-- 列表容器 -->
+    <div class="report-list-title">详细数据</div>
+    <div id="reportBody"></div>
+  </div>
+</div>
+
 <script>
 (function() {
   const STORAGE_KEY = 'asakim_ledger_v3';
+  let myChart = null; // 用于存储图表实例
 
   const DEFAULT_LEDGER_DATA = {
     columns: ['日期', '分类', '名称', '金额'],
@@ -287,10 +364,7 @@
   }
 
   let state = load();
-  
-  // 三种模式：'edit'(记账), 'delete'(删除), 'sort'(排序)
   let currentMode = 'edit'; 
-  
   let isDelEmojiMode = false;
   let deletedRowDataStack = []; 
   let deletedLedgerData = null; 
@@ -379,19 +453,16 @@
     document.getElementById('undoLedgerBtn').style.display = deletedLedgerData ? 'inline-block' : 'none';
   }
 
-  // ===== 更新工具栏状态 =====
   function updateToolbar() {
     const modeEditBtn = document.getElementById('modeEditBtn');
     const modeDelBtn = document.getElementById('modeDelBtn');
     const modeSortBtn = document.getElementById('modeSortBtn');
     const undoRowBtn = document.getElementById('undoRowBtn');
     
-    // 按钮高亮状态
     modeEditBtn.className = currentMode === 'edit' ? 'btn btn-mode-active' : 'btn';
     modeDelBtn.className = currentMode === 'delete' ? 'btn btn-del-active' : 'btn';
     modeSortBtn.className = currentMode === 'sort' ? 'btn btn-sort-active' : 'btn';
 
-    // 撤销按钮逻辑（只在删除模式显示）
     if (currentMode === 'delete' && deletedRowDataStack.length > 0) {
       undoRowBtn.style.display = 'flex';
       const lastAction = deletedRowDataStack[deletedRowDataStack.length - 1];
@@ -401,13 +472,11 @@
       undoRowBtn.style.display = 'none';
     }
     
-    // 标签删除逻辑
     const delEmojiBtn = document.getElementById('toggleDelEmojiBtn');
     const undoEmojiBtn = document.getElementById('undoEmojiBtn');
     if (isDelEmojiMode) {
       delEmojiBtn.innerHTML = '✕ 取消删标签';
       delEmojiBtn.className = 'btn btn-mode-active';
-      
       if (deletedEmojiDataStack.length > 0) {
         undoEmojiBtn.style.display = 'flex';
         undoEmojiBtn.innerHTML = `↩️ 撤销 (${deletedEmojiDataStack.length})`;
@@ -421,6 +490,37 @@
     }
   }
 
+  function amountColumnIndex(ledger) {
+    const targetLedger = ledger || getLedger();
+    const idx = targetLedger.columns.findIndex(c => c.includes('金额'));
+    return idx >= 0 ? idx : targetLedger.columns.length - 1;
+  }
+
+  function getRowAmount(row, amtIdx) {
+    if (row.children && row.children.length > 0) {
+      let sum = 0;
+      row.children.forEach(c => {
+        let val = parseFloat(c.cells[amtIdx]);
+        if (!isNaN(val)) sum += val;
+      });
+      return sum;
+    } else {
+      let val = parseFloat(row.cells[amtIdx]);
+      return isNaN(val) ? 0 : val;
+    }
+  }
+
+  function renderTotal() {
+    const ledger = getLedger();
+    const idx = amountColumnIndex(ledger);
+    let sum = 0;
+    ledger.rows.forEach(row => {
+      sum += getRowAmount(row, idx);
+    });
+    document.getElementById('totalDisplay').textContent =
+      sum % 1 === 0 ? sum.toString() : sum.toFixed(2);
+  }
+
   function renderEmojiPanel() {
     const panel = document.getElementById('emojiPanel');
     panel.innerHTML = '';
@@ -432,10 +532,8 @@
         chip.innerHTML = `<span>${text}</span><span class="del-x">✕</span>`;
         chip.addEventListener('click', function() {
           if (!confirm(`确定要删除标签【${text}】吗？`)) return;
-          
           deletedEmojiDataStack.push({ index: index, text: text });
           if (deletedEmojiDataStack.length > 3) deletedEmojiDataStack.shift();
-          
           state.emojis.splice(index, 1);
           save(); render();
         });
@@ -449,13 +547,12 @@
             const ledger = getLedger();
             if (active.isChild) {
               ledger.rows[active.ri].children[active.cIdx].cells[active.ci] = text;
-              if (active.ci === amountColumnIndex()) {
-                updateParentAmountDisplay(active.ri);
-                renderTotal();
+              if (active.ci === amountColumnIndex(ledger)) {
+                render(); 
               }
             } else {
               ledger.rows[active.ri].cells[active.ci] = text;
-              renderTotal();
+              render();
             }
             save();
           } else {
@@ -480,12 +577,10 @@
         th.textContent = col;
         th.setAttribute('contenteditable', 'true');
         th.style.outline = 'none';
-        
         th.addEventListener('input', function() {
           ledger.columns[ci] = this.textContent;
           save();
         });
-        
         th.addEventListener('blur', function() {
           if (this.textContent.trim() === '') {
             this.textContent = '未命名';
@@ -517,7 +612,6 @@
         });
         th.appendChild(colDelBtn);
       } else {
-        // 排序模式：只读
         th.textContent = col;
         th.setAttribute('contenteditable', 'false');
         th.style.cursor = 'default';
@@ -547,7 +641,7 @@
       return;
     }
 
-    const amtIdx = amountColumnIndex();
+    const amtIdx = amountColumnIndex(ledger);
     const dateColIdx = ledger.columns.findIndex(c => c.includes('日期'));
     const todayStr = getTodayStr();
 
@@ -556,14 +650,7 @@
       while (row.cells.length < ledger.columns.length) row.cells.push('');
 
       const hasChildren = row.children && row.children.length > 0;
-      
-      let autoSum = 0;
-      if (hasChildren) {
-        row.children.forEach(c => {
-          let val = parseFloat(c.cells[amtIdx]);
-          if (!isNaN(val)) autoSum += val;
-        });
-      }
+      const autoSum = hasChildren ? getRowAmount(row, amtIdx) : 0;
 
       row.cells.forEach((cellVal, ci) => {
         const td = document.createElement('td');
@@ -640,7 +727,6 @@
       tr.appendChild(tdOp);
       tbody.appendChild(tr);
 
-      // 只有在非排序模式下才渲染子行
       if (currentMode !== 'sort' && row.isExpanded) {
         if (dateColIdx > -1 && row.children.length > 1) {
           row.children.sort((a, b) => {
@@ -685,8 +771,7 @@
                   child.cells[ci] = this.textContent;
                   save();
                   if (ci === amtIdx) {
-                    updateParentAmountDisplay(ri);
-                    renderTotal();
+                    render(); 
                   }
                 });
                 childTd.addEventListener('click', function() {
@@ -708,9 +793,7 @@
             delChild.addEventListener('click', () => {
               deletedRowDataStack.push({ type: 'child', parentIndex: ri, childIndex: cIdx, data: JSON.parse(JSON.stringify(child)) });
               if (deletedRowDataStack.length > 3) deletedRowDataStack.shift();
-              
               row.children.splice(cIdx, 1);
-              if (row.children.length === 0) row.cells[amtIdx] = '';
               save(); render();
             });
             childOp.appendChild(delChild);
@@ -742,68 +825,16 @@
     });
   }
 
-  // ===== 移动行逻辑 =====
   function moveRow(index, direction) {
     const ledger = getLedger();
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= ledger.rows.length) return;
-    
-    // 交换位置
     const temp = ledger.rows[index];
     ledger.rows[index] = ledger.rows[targetIndex];
     ledger.rows[targetIndex] = temp;
-    
     save(); render();
   }
 
-  function updateParentAmountDisplay(ri) {
-    const ledger = getLedger();
-    const row = ledger.rows[ri];
-    const amtIdx = amountColumnIndex();
-    let sum = 0;
-    row.children.forEach(c => {
-      let val = parseFloat(c.cells[amtIdx]);
-      if (!isNaN(val)) sum += val;
-    });
-    
-    const tbody = document.getElementById('tableBody');
-    const parentTrs = Array.from(tbody.children).filter(tr => !tr.classList.contains('child-row'));
-    const currentTr = parentTrs[ri];
-    
-    if (currentTr) {
-      const amountTd = currentTr.children[amtIdx];
-      if (amountTd) {
-        amountTd.textContent = sum % 1 === 0 ? sum.toString() : sum.toFixed(2);
-      }
-    }
-  }
-
-  function amountColumnIndex() {
-    const ledger = getLedger();
-    const idx = ledger.columns.findIndex(c => c.includes('金额'));
-    return idx >= 0 ? idx : ledger.columns.length - 1;
-  }
-
-  function renderTotal() {
-    const ledger = getLedger();
-    const idx = amountColumnIndex();
-    let sum = 0;
-    ledger.rows.forEach(row => {
-      if (row.children && row.children.length > 0) {
-        row.children.forEach(c => {
-          let val = parseFloat(c.cells[idx]);
-          if (!isNaN(val)) sum += val;
-        });
-      } else {
-        let val = parseFloat(row.cells[idx]);
-        if (!isNaN(val)) sum += val;
-      }
-    });
-    document.getElementById('totalDisplay').textContent =
-      sum % 1 === 0 ? sum.toString() : sum.toFixed(2);
-  }
-
-  // ====== 导航与分类事件 ======
   document.getElementById('yearSelect').addEventListener('change', function() {
     state.currentYear = parseInt(this.value);
     deletedRowDataStack = []; deletedLedgerData = null; 
@@ -908,28 +939,20 @@
     save(); render();
   });
 
-  // ====== 表格模式切换 ======
   document.getElementById('modeEditBtn').addEventListener('click', function() {
-    currentMode = 'edit';
-    render();
+    currentMode = 'edit'; render();
   });
-  
   document.getElementById('modeDelBtn').addEventListener('click', function() {
-    currentMode = 'delete';
-    render();
+    currentMode = 'delete'; render();
   });
-  
   document.getElementById('modeSortBtn').addEventListener('click', function() {
-    currentMode = 'sort';
-    deletedRowDataStack = []; // 切换模式清空撤销记录
-    render();
+    currentMode = 'sort'; deletedRowDataStack = []; render();
   });
 
   document.getElementById('undoRowBtn').addEventListener('click', function() {
     if (deletedRowDataStack.length === 0) return;
     const action = deletedRowDataStack.pop();
     const ledger = getLedger();
-    
     if (action.type === 'parent') {
       ledger.rows.splice(action.parentIndex, 0, action.data);
     } else if (action.type === 'child') {
@@ -967,6 +990,208 @@
     state.years[state.currentYear][state.currentMonth] = JSON.parse(JSON.stringify(DEFAULT_LEDGER_DATA));
     deletedRowDataStack = [];
     save(); render();
+  });
+
+  // ====== 数据工具：下拉菜单与功能 ======
+  const dataToolBtn = document.getElementById('dataToolBtn');
+  const dataToolMenu = document.getElementById('dataToolMenu');
+  
+  dataToolBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dataToolMenu.classList.toggle('show');
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!dataToolMenu.contains(e.target) && e.target !== dataToolBtn) {
+      dataToolMenu.classList.remove('show');
+    }
+  });
+
+  // 生成随机莫兰迪色系，保证图表好看
+  const CHART_COLORS = [
+    '#5b8ff9', '#5ad8a6', '#5d7092', '#f6bd16', '#e8684a',
+    '#6dc8ec', '#9270ca', '#ff9d4d', '#269a99', '#ff99c3'
+  ];
+
+  // 1. 导出 CSV
+  document.getElementById('exportCsvBtn').addEventListener('click', function() {
+    dataToolMenu.classList.remove('show');
+    const ledger = getLedger();
+    const amtIdx = amountColumnIndex(ledger);
+    let csvContent = "";
+    csvContent += ledger.columns.join(",") + "\n";
+    
+    ledger.rows.forEach(row => {
+      const parentCells = [...row.cells];
+      if (row.children && row.children.length > 0) {
+        parentCells[amtIdx] = getRowAmount(row, amtIdx);
+      }
+      csvContent += parentCells.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(",") + "\n";
+      if (row.children && row.children.length > 0) {
+        row.children.forEach(child => {
+          const childCells = [...child.cells];
+          childCells[0] = "  └ " + (childCells[0] || '');
+          csvContent += childCells.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(",") + "\n";
+        });
+      }
+    });
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Asakim账本_${state.currentYear}年${state.currentMonth}月.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+
+  // 报表弹窗相关
+  const reportModal = document.getElementById('reportModal');
+  const closeModalBtn = document.getElementById('closeModalBtn');
+  const reportBody = document.getElementById('reportBody');
+  const modalTitle = document.getElementById('modalTitle');
+  const ctx = document.getElementById('reportChart').getContext('2d');
+
+  closeModalBtn.addEventListener('click', () => { 
+    reportModal.classList.remove('show'); 
+    if(myChart) myChart.destroy();
+  });
+  reportModal.addEventListener('click', (e) => { 
+    if (e.target === reportModal) {
+      reportModal.classList.remove('show');
+      if(myChart) myChart.destroy();
+    }
+  });
+
+  // 2. 生成月报表 (饼图)
+  document.getElementById('monthReportBtn').addEventListener('click', function() {
+    dataToolMenu.classList.remove('show');
+    const ledger = getLedger();
+    const amtIdx = amountColumnIndex(ledger);
+    const catIdx = ledger.columns.findIndex(c => c.includes('分类'));
+    
+    let total = 0;
+    let catSummary = {};
+
+    ledger.rows.forEach(row => {
+      const items = (row.children && row.children.length > 0) ? row.children : [row];
+      items.forEach(item => {
+        let val = parseFloat(item.cells[amtIdx]);
+        if (!isNaN(val)) {
+          total += val;
+          let catName = catIdx >= 0 ? (item.cells[catIdx] || row.cells[catIdx] || '未分类') : '未分类';
+          catSummary[catName] = (catSummary[catName] || 0) + val;
+        }
+      });
+    });
+
+    const sortedCats = Object.entries(catSummary).sort((a, b) => b[1] - a[1]);
+
+    modalTitle.textContent = `📈 ${state.currentYear}年${state.currentMonth}月 报表`;
+    
+    // 渲染图表
+    if (myChart) myChart.destroy();
+    if (sortedCats.length > 0) {
+      myChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: sortedCats.map(item => item[0]),
+          datasets: [{
+            data: sortedCats.map(item => item[1]),
+            backgroundColor: CHART_COLORS,
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'right', labels: { boxWidth: 12, font: {size: 11} } }
+          }
+        }
+      });
+    }
+
+    // 渲染列表
+    let html = '';
+    if (sortedCats.length === 0) {
+      html = '<div style="text-align:center; color:#9aaac9; padding: 2rem 0;">本月暂无数据</div>';
+    } else {
+      sortedCats.forEach(([cat, amount]) => {
+        html += `<div class="report-item"><span>${cat}</span><span>¥ ${amount % 1 === 0 ? amount : amount.toFixed(2)}</span></div>`;
+      });
+      html += `<div class="report-total">总计：¥ ${total % 1 === 0 ? total : total.toFixed(2)}</div>`;
+    }
+    reportBody.innerHTML = html;
+    reportModal.classList.add('show');
+  });
+
+  // 3. 生成年报表 (柱状图)
+  document.getElementById('yearReportBtn').addEventListener('click', function() {
+    dataToolMenu.classList.remove('show');
+    const y = state.currentYear;
+    const yearData = state.years[y] || {};
+    
+    let yearTotal = 0;
+    let monthSummary = [];
+
+    // 固定生成1-12月的数据
+    for (let m = 1; m <= 12; m++) {
+      let monthSum = 0;
+      if (yearData[m]) {
+        const ledger = yearData[m];
+        const amtIdx = amountColumnIndex(ledger);
+        ledger.rows.forEach(row => {
+          monthSum += getRowAmount(row, amtIdx);
+        });
+      }
+      yearTotal += monthSum;
+      monthSummary.push({ month: m, amount: monthSum });
+    }
+
+    modalTitle.textContent = `📅 ${y}年 报表`;
+    
+    // 渲染图表
+    if (myChart) myChart.destroy();
+    myChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: monthSummary.map(item => `${item.month}月`),
+        datasets: [{
+          label: '月度开销',
+          data: monthSummary.map(item => item.amount),
+          backgroundColor: '#5b8ff9',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#f5f7fb' } },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+
+    // 渲染列表
+    let html = '';
+    const activeMonths = monthSummary.filter(item => item.amount > 0);
+    if (activeMonths.length === 0) {
+      html = '<div style="text-align:center; color:#9aaac9; padding: 2rem 0;">本年度暂无数据</div>';
+    } else {
+      activeMonths.forEach(item => {
+        html += `<div class="report-item"><span>${item.month} 月</span><span>¥ ${item.amount % 1 === 0 ? item.amount : item.amount.toFixed(2)}</span></div>`;
+      });
+      html += `<div class="report-total">全年总计：¥ ${yearTotal % 1 === 0 ? yearTotal : yearTotal.toFixed(2)}</div>`;
+    }
+    reportBody.innerHTML = html;
+    reportModal.classList.add('show');
   });
 
   render();
