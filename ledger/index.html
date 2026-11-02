@@ -28,7 +28,8 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
       border: 1px solid #e6ecf5; margin-bottom: 1.5rem;
     }
-    .card-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;}
+    .card-title { font-size: 1.1rem; font-weight: 600; }
 
     /* 账本导航栏 */
     .ledger-nav {
@@ -45,7 +46,7 @@
     .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; align-items: center; }
     .btn {
       border: 1px solid #e6ecf5; background: #f9fbfe; color: #1e2b4f;
-      border-radius: 12px; padding: 0.45rem 0.9rem; font-size: 0.85rem;
+      border-radius: 12px; padding: 0.35rem 0.75rem; font-size: 0.85rem;
       cursor: pointer; transition: all 0.2s ease; font-family: inherit;
       display: flex; align-items: center; gap: 0.3rem; white-space: nowrap;
     }
@@ -59,13 +60,19 @@
     .btn-edit-active { background: #1e2b4f; color: white; border-color: #1e2b4f; }
 
     /* Emoji 快捷面板 */
-    .emoji-panel { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
+    .emoji-panel { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; min-height: 30px; }
     .emoji-chip {
       border: 1px solid #e6ecf5; background: white; border-radius: 10px;
       padding: 0.3rem 0.55rem; font-size: 0.8rem; cursor: pointer;
       transition: all 0.2s ease; font-family: inherit; color: #1e2b4f;
+      display: flex; align-items: center; gap: 0.3rem;
     }
     .emoji-chip:hover { background: #edf2fa; border-color: #b7c9e8; }
+    
+    /* 删除模式下的 Emoji 标签 */
+    .emoji-chip.delete-mode { border-color: #e8c4c0; background: #fdf0ef; color: #c0392b; cursor: crosshair; }
+    .emoji-chip.delete-mode:hover { background: #fbe4e2; }
+    .emoji-chip .del-x { font-size: 0.7rem; opacity: 0.6; }
 
     /* 表格 */
     .table-wrap { overflow-x: auto; margin-bottom: 1rem; -webkit-overflow-scrolling: touch; }
@@ -153,7 +160,7 @@
       .card { padding: 1rem; border-radius: 16px; }
       .toolbar > span[style*="flex:1"] { display: none; }
       .toolbar { gap: 0.4rem; }
-      .btn { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
+      .btn { padding: 0.35rem 0.5rem; font-size: 0.8rem; }
       .select-box { padding: 0.4rem 0.5rem; font-size: 0.8rem; }
       th, td { padding: 0.5rem 0.3rem; font-size: 0.85rem; }
       
@@ -191,14 +198,15 @@
 
   <!-- 分类面板 -->
   <div class="card">
-    <div class="card-title">🍽️ 分类快捷填入</div>
-    <div class="emoji-panel" id="emojiPanel"></div>
-    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-      <span style="font-size:0.85rem; color:#6b7b9e; white-space:nowrap;">手动添加：</span>
-      <input id="customCategory" type="text" placeholder="例如：🎮 游戏"
-        style="flex:1; min-width:120px; border:1px solid #e6ecf5; border-radius:12px; padding:0.5rem 0.8rem; font-family:inherit; font-size:0.9rem; outline:none;">
-      <button class="btn" id="addCategoryBtn">添加</button>
+    <div class="card-header">
+      <div class="card-title">🍽️ 分类快捷填入</div>
+      <div class="toolbar" style="margin-bottom: 0;">
+        <button class="btn" id="addEmojiBtn">＋ 标签</button>
+        <button class="btn btn-danger" id="toggleDelEmojiBtn">✕ 删标签</button>
+        <button class="btn" id="undoEmojiBtn" style="display:none;">↩️ 撤销</button>
+      </div>
     </div>
+    <div class="emoji-panel" id="emojiPanel"></div>
   </div>
 
   <!-- 账目表格 -->
@@ -228,7 +236,7 @@
 
 <script>
 (function() {
-  const STORAGE_KEY = 'asakim_ledger_v3'; // 升级了版本号
+  const STORAGE_KEY = 'asakim_ledger_v3';
 
   const DEFAULT_LEDGER_DATA = {
     columns: ['日期', '分类', '名称', '金额'],
@@ -238,13 +246,17 @@
     ]
   };
 
-  // 获取今天日期字符串 YYYY-MM-DD
+  const DEFAULT_EMOJIS = [
+    '🍚 早餐', '🍜 午餐', '🍽️ 晚餐', '🧋 奶茶', '☕ 咖啡',
+    '🚌 交通', '🛒 购物', '🏠 房租', '💡 水电', '📱 话费',
+    '🎮 游戏', '📚 书籍', '💊 医疗', '🎁 礼物', '✈️ 旅行'
+  ];
+
   function getTodayStr() {
     const today = new Date();
     return today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
   }
 
-  // 初始化状态结构
   function getInitState() {
     const today = new Date();
     const y = today.getFullYear();
@@ -252,6 +264,7 @@
     return {
       currentYear: y,
       currentMonth: m,
+      emojis: [...DEFAULT_EMOJIS],
       years: {
         [y]: {
           [m]: JSON.parse(JSON.stringify(DEFAULT_LEDGER_DATA))
@@ -262,19 +275,24 @@
 
   let state = load();
   let isDeleteMode = false;
+  let isDelEmojiMode = false; // 标签删除模式
   let deletedRowData = null;
-  let deletedLedgerData = null; // 记录删除的年/月
+  let deletedLedgerData = null; 
+  let deletedEmojiData = null; // 记录删除的标签
 
   function load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed.currentYear && parsed.years) return parsed;
+        if (parsed.currentYear && parsed.years) {
+          if (!parsed.emojis) parsed.emojis = [...DEFAULT_EMOJIS]; // 兼容老数据
+          return parsed;
+        }
       }
     } catch (e) {}
     
-    // 检查是否有旧版数据 (asakim_ledger_v2)
+    // 兼容旧版数据
     try {
       const oldRaw = localStorage.getItem('asakim_ledger_v2');
       if (oldRaw) {
@@ -294,7 +312,6 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  // 获取当前账本数据
   function getLedger() {
     const y = state.currentYear;
     const m = state.currentMonth;
@@ -305,12 +322,6 @@
     return state.years[y][m];
   }
 
-  const EMOJIS = [
-    '🍚 早餐', '🍜 午餐', '🍽️ 晚餐', '🧋 奶茶', '☕ 咖啡',
-    '🚌 交通', '🛒 购物', '🏠 房租', '💡 水电', '📱 话费',
-    '🎮 游戏', '📚 书籍', '💊 医疗', '🎁 礼物', '✈️ 旅行'
-  ];
-
   function render() {
     renderNav();
     renderHead();
@@ -320,17 +331,14 @@
     updateToolbar();
   }
 
-  // ===== 导航栏渲染 =====
   function renderNav() {
     const yearSelect = document.getElementById('yearSelect');
     const monthSelect = document.getElementById('monthSelect');
     
-    // 渲染年份
     yearSelect.innerHTML = '';
     if (!state.years[state.currentYear]) state.years[state.currentYear] = {};
     
     const years = Object.keys(state.years).sort((a,b) => b - a);
-    // 确保当前年份在列表中
     if (!years.includes(state.currentYear.toString())) {
       years.push(state.currentYear.toString());
       years.sort((a,b) => b - a);
@@ -344,7 +352,6 @@
       yearSelect.appendChild(opt);
     });
 
-    // 渲染月份
     monthSelect.innerHTML = '';
     for (let i = 1; i <= 12; i++) {
       const opt = document.createElement('option');
@@ -354,23 +361,78 @@
       monthSelect.appendChild(opt);
     }
 
-    // 撤销按钮状态
-    const undoBtn = document.getElementById('undoLedgerBtn');
-    undoBtn.style.display = deletedLedgerData ? 'inline-block' : 'none';
+    document.getElementById('undoLedgerBtn').style.display = deletedLedgerData ? 'inline-block' : 'none';
   }
 
   function updateToolbar() {
     const modeBtn = document.getElementById('toggleModeBtn');
-    const undoBtn = document.getElementById('undoRowBtn');
+    const undoRowBtn = document.getElementById('undoRowBtn');
     if (isDeleteMode) {
       modeBtn.innerHTML = '🗑️ 删除模式';
       modeBtn.className = 'btn btn-mode-active';
-      undoBtn.style.display = deletedRowData ? 'flex' : 'none';
+      undoRowBtn.style.display = deletedRowData ? 'flex' : 'none';
     } else {
       modeBtn.innerHTML = '✏️ 记账模式';
       modeBtn.className = 'btn btn-edit-active';
-      undoBtn.style.display = 'none';
+      undoRowBtn.style.display = 'none';
     }
+    
+    const delEmojiBtn = document.getElementById('toggleDelEmojiBtn');
+    const undoEmojiBtn = document.getElementById('undoEmojiBtn');
+    if (isDelEmojiMode) {
+      delEmojiBtn.innerHTML = '✕ 取消删标签';
+      delEmojiBtn.className = 'btn btn-mode-active';
+      undoEmojiBtn.style.display = deletedEmojiData ? 'flex' : 'none';
+    } else {
+      delEmojiBtn.innerHTML = '✕ 删标签';
+      delEmojiBtn.className = 'btn btn-danger';
+      undoEmojiBtn.style.display = 'none';
+    }
+  }
+
+  // ===== 渲染 Emoji 面板 =====
+  function renderEmojiPanel() {
+    const panel = document.getElementById('emojiPanel');
+    panel.innerHTML = '';
+    state.emojis.forEach((text, index) => {
+      const chip = document.createElement('button');
+      chip.className = 'emoji-chip' + (isDelEmojiMode ? ' delete-mode' : '');
+      
+      if (isDelEmojiMode) {
+        chip.innerHTML = `<span>${text}</span><span class="del-x">✕</span>`;
+        chip.title = '点击删除此标签';
+        chip.addEventListener('click', function() {
+          if (!confirm(`确定要删除标签【${text}】吗？`)) return;
+          deletedEmojiData = { index: index, text: text };
+          state.emojis.splice(index, 1);
+          save(); render();
+        });
+      } else {
+        chip.textContent = text;
+        chip.addEventListener('click', function() {
+          if (isDeleteMode) return alert('请先切换到记账模式');
+          const active = window._activeCell;
+          if (active && active.el) {
+            active.el.textContent = text;
+            const ledger = getLedger();
+            if (active.isChild) {
+              ledger.rows[active.ri].children[active.cIdx].cells[active.ci] = text;
+              if (active.ci === amountColumnIndex()) {
+                updateParentAmountDisplay(active.ri);
+                renderTotal();
+              }
+            } else {
+              ledger.rows[active.ri].cells[active.ci] = text;
+              renderTotal();
+            }
+            save();
+          } else {
+            alert('请先点击表格中的一个单元格，再选择分类。');
+          }
+        });
+      }
+      panel.appendChild(chip);
+    });
   }
 
   // ===== 表头渲染 =====
@@ -415,7 +477,6 @@
         colDelBtn.addEventListener('click', function(e) {
           e.stopPropagation();
           if(!confirm('确定删除此列吗？')) return;
-          // 简单删除列（直接操作数据）
           ledger.columns.splice(ci, 1);
           ledger.rows.forEach(r => {
             r.cells.splice(ci, 1);
@@ -523,14 +584,12 @@
       tr.appendChild(tdOp);
       tbody.appendChild(tr);
 
-      // ====== 渲染子账单 ======
       if (row.isExpanded) {
-        // 智能排序：如果有日期列，根据日期倒序排
         if (dateColIdx > -1 && row.children.length > 1) {
           row.children.sort((a, b) => {
             let d1 = a.cells[dateColIdx] || '';
             let d2 = b.cells[dateColIdx] || '';
-            return d2.localeCompare(d1); // 降序
+            return d2.localeCompare(d1);
           });
         }
 
@@ -545,12 +604,11 @@
             if (ci === 0) {
               childTd.innerHTML = '<span class="tree-indent">└</span>';
             } else if (ci === dateColIdx) {
-              // 日期列特殊处理
               const dateInput = document.createElement('input');
               dateInput.type = 'date';
               dateInput.className = 'child-date-input';
               dateInput.value = child.cells[ci] || todayStr;
-              if (!child.cells[ci]) child.cells[ci] = todayStr; // 默认填入今天
+              if (!child.cells[ci]) child.cells[ci] = todayStr;
               
               if (isDeleteMode) {
                 dateInput.disabled = true;
@@ -558,12 +616,11 @@
                 dateInput.addEventListener('change', function() {
                   child.cells[ci] = this.value;
                   save();
-                  render(); // 选完日期立即重新排序
+                  render(); 
                 });
               }
               childTd.appendChild(dateInput);
             } else {
-              // 普通列
               childTd.textContent = child.cells[ci] || '';
               if (!isDeleteMode) {
                 childTd.setAttribute('contenteditable', 'true');
@@ -672,42 +729,10 @@
       sum % 1 === 0 ? sum.toString() : sum.toFixed(2);
   }
 
-  function renderEmojiPanel() {
-    const panel = document.getElementById('emojiPanel');
-    panel.innerHTML = '';
-    EMOJIS.forEach(text => {
-      const chip = document.createElement('button');
-      chip.className = 'emoji-chip';
-      chip.textContent = text;
-      chip.addEventListener('click', function() {
-        if (isDeleteMode) return alert('请先切换到记账模式');
-        const active = window._activeCell;
-        if (active && active.el) {
-          active.el.textContent = text;
-          const ledger = getLedger();
-          if (active.isChild) {
-            ledger.rows[active.ri].children[active.cIdx].cells[active.ci] = text;
-            if (active.ci === amountColumnIndex()) {
-              updateParentAmountDisplay(active.ri);
-              renderTotal();
-            }
-          } else {
-            ledger.rows[active.ri].cells[active.ci] = text;
-            renderTotal();
-          }
-          save();
-        } else {
-          alert('请先点击表格中的一个单元格，再选择分类。');
-        }
-      });
-      panel.appendChild(chip);
-    });
-  }
-
   // ====== 导航事件 ======
   document.getElementById('yearSelect').addEventListener('change', function() {
     state.currentYear = parseInt(this.value);
-    deletedRowData = null; deletedLedgerData = null; // 切换账本清空撤销
+    deletedRowData = null; deletedLedgerData = null; 
     save(); render();
   });
 
@@ -744,7 +769,7 @@
     
     deletedLedgerData = { type: 'year', year: y, data: JSON.parse(JSON.stringify(state.years[y])) };
     delete state.years[y];
-    state.currentYear = Object.keys(state.years)[0]; // 切到第一个可用年
+    state.currentYear = Object.keys(state.years)[0]; 
     save(); render();
   });
 
@@ -759,11 +784,10 @@
     deletedLedgerData = { type: 'month', year: y, month: m, data: JSON.parse(JSON.stringify(state.years[y][m])) };
     delete state.years[y][m];
     
-    // 自动切到相邻月份
     if (m > 1) state.currentMonth = m - 1;
     else {
       if (Object.keys(state.years).length > 1) {
-        delete state.years[y]; // 只有1月且删除了，清理空年份
+        delete state.years[y]; 
         state.currentYear = Object.keys(state.years)[0];
         state.currentMonth = 12;
       } else {
@@ -785,6 +809,29 @@
       state.currentMonth = deletedLedgerData.month;
     }
     deletedLedgerData = null;
+    save(); render();
+  });
+
+  // ====== 标签增删事件 ======
+  document.getElementById('addEmojiBtn').addEventListener('click', function() {
+    if (isDelEmojiMode) return alert('请先取消删除模式');
+    const newTag = prompt('请输入新的标签名称（可以带 Emoji）:');
+    if (newTag && newTag.trim()) {
+      state.emojis.push(newTag.trim());
+      save(); render();
+    }
+  });
+
+  document.getElementById('toggleDelEmojiBtn').addEventListener('click', function() {
+    isDelEmojiMode = !isDelEmojiMode;
+    if (!isDelEmojiMode) deletedEmojiData = null; // 退出时清空撤销记录
+    render(); 
+  });
+
+  document.getElementById('undoEmojiBtn').addEventListener('click', function() {
+    if (!deletedEmojiData) return;
+    state.emojis.splice(deletedEmojiData.index, 0, deletedEmojiData.text);
+    deletedEmojiData = null;
     save(); render();
   });
 
@@ -824,32 +871,6 @@
     state.years[state.currentYear][state.currentMonth] = JSON.parse(JSON.stringify(DEFAULT_LEDGER_DATA));
     deletedRowData = null;
     save(); render();
-  });
-
-  document.getElementById('addCategoryBtn').addEventListener('click', function() {
-    if (isDeleteMode) return alert('请先切换到记账模式');
-    const input = document.getElementById('customCategory');
-    const val = input.value.trim();
-    if (!val) return;
-    const active = window._activeCell;
-    if (active && active.el) {
-      active.el.textContent = val;
-      const ledger = getLedger();
-      if (active.isChild) {
-        ledger.rows[active.ri].children[active.cIdx].cells[active.ci] = val;
-        if (active.ci === amountColumnIndex()) {
-          updateParentAmountDisplay(active.ri);
-          renderTotal();
-        }
-      } else {
-        ledger.rows[active.ri].cells[active.ci] = val;
-        renderTotal();
-      }
-      save();
-    } else {
-      alert('请先点击表格中的一个单元格，再添加分类。');
-    }
-    input.value = '';
   });
 
   render();
