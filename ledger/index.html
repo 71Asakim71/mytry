@@ -23,7 +23,6 @@
     }
     .back-link:hover { color: #1e2b4f; }
 
-    /* 卡片样式，与首页一致 */
     .card {
       background: white; border-radius: 20px; padding: 1.5rem;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
@@ -37,12 +36,16 @@
       border: 1px solid #e6ecf5; background: #f9fbfe; color: #1e2b4f;
       border-radius: 12px; padding: 0.45rem 0.9rem; font-size: 0.85rem;
       cursor: pointer; transition: all 0.2s ease; font-family: inherit;
+      display: flex; align-items: center; gap: 0.3rem;
     }
     .btn:hover { background: #edf2fa; border-color: #b7c9e8; }
     .btn-primary { background: #1e2b4f; color: white; border-color: #1e2b4f; }
-    .btn-primary:hover { background: #2a3d6b; }
-    .btn-danger { color: #c0392b; }
-    .btn-danger:hover { background: #fdf0ef; border-color: #e8c4c0; }
+    .btn-danger { background: #fdf0ef; color: #c0392b; border-color: #e8c4c0; }
+    .btn-danger:hover { background: #fbe4e2; }
+    
+    /* 激活状态的模式按钮 */
+    .btn-mode-active { background: #fdf0ef; color: #c0392b; border-color: #e8c4c0; }
+    .btn-edit-active { background: #1e2b4f; color: white; border-color: #1e2b4f; }
 
     /* Emoji 快捷面板 */
     .emoji-panel { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
@@ -56,50 +59,75 @@
     /* 表格 */
     .table-wrap { overflow-x: auto; margin-bottom: 1rem; -webkit-overflow-scrolling: touch; }
     table { width: 100%; border-collapse: collapse; }
+    
     th, td { 
       padding: 0.4rem 0.2rem; 
       border-bottom: 1px solid #eef2f8; 
       text-align: left; 
       vertical-align: top; 
       font-size: 0.85rem; 
-      max-width: 85px; /* 限制最大宽度，超过会自动换行，大约只能放4个中文 */
+      max-width: 90px; /* 限制最大宽度 */
       word-break: break-all; 
+      position: relative;
     }
+    
     th { 
       font-weight: 600; 
       font-size: 0.8rem; 
       color: #6b7b9e; 
       padding-bottom: 0.5rem; 
     }
+    
+    /* 单元格 */
     td[contenteditable="true"] {
       outline: none; border-radius: 8px; transition: background 0.15s ease;
-      min-width: 45px; /* 最窄不小于45px */
+      min-width: 40px; 
       padding: 4px;
     }
     td[contenteditable="true"]:focus { background: #f0f4fb; }
-    /* 右侧操作按钮改为上下排列，极致省空间 */
-    .cell-tools { 
-      display: flex; 
-      flex-direction: column; 
-      gap: 0.3rem; 
-      align-items: center; 
-      justify-content: center;
-    }
+    /* 在删除模式下，禁用编辑指针和背景 */
+    td[contenteditable="false"] { cursor: default; }
+    
+    /* 操作列 */
+    .action-col { width: 32px; padding: 4px 0; text-align: center; }
+    .cell-tools { display: flex; flex-direction: column; gap: 0.4rem; align-items: center; justify-content: center; }
+    
+    /* 普通模式下的颜色圆点 */
     .color-input {
-      width: 20px; height: 20px; border: 1px solid #e6ecf5; border-radius: 6px;
-      padding: 1px; cursor: pointer; background: white;
+      -webkit-appearance: none; 
+      width: 20px; height: 20px; 
+      border: none;
+      border-radius: 50%; /* 改为圆形 */
+      padding: 0; 
+      cursor: pointer; 
+      overflow: hidden;
+      box-shadow: 0 0 0 1px #e6ecf5; /* 用阴影替代边框更圆润 */
     }
-    .row-del {
+    .color-input::-webkit-color-swatch-wrapper { padding: 0; }
+    .color-input::-webkit-color-swatch { border: none; border-radius: 50%; }
+
+    /* 删除模式下的删除按钮 */
+    .action-btn-del {
       border: none; background: transparent; color: #c0392b; cursor: pointer;
-      font-size: 0.9rem; padding: 0; line-height: 1;
+      font-size: 1.1rem; padding: 0.2rem; line-height: 1;
+      border-radius: 50%;
     }
+    .action-btn-del:hover { background: #fdf0ef; }
+
+    /* 删除模式下的表头列删除按钮 */
+    .col-del-btn {
+      position: absolute;
+      top: 0; right: 0;
+      color: #c0392b; background: #fdf0ef; border: none; border-radius: 4px;
+      font-size: 0.7rem; cursor: pointer; padding: 2px 4px;
+    }
+
     /* 总计 */
     .total-bar {
       display: flex; justify-content: flex-end; align-items: baseline; gap: 0.6rem;
       padding-top: 0.8rem; border-top: 2px solid #eef2f8; font-size: 1rem;
     }
     .total-amount { font-size: 1.4rem; font-weight: 700; color: #1e2b4f; }
-
     .empty-hint { color: #9aaac9; font-size: 0.9rem; text-align: center; padding: 2rem 0; }
     footer { text-align: center; margin-top: 2rem; color: #9aaac9; font-size: 0.85rem; }
   </style>
@@ -119,10 +147,10 @@
       点击下方标签，将“Emoji + 文字”填入当前选中的单元格。也可以直接手动输入新的分类。
     </p>
     <div class="emoji-panel" id="emojiPanel"></div>
-    <div style="display:flex; gap:0.5rem; align-items:center;">
-      <span style="font-size:0.85rem; color:#6b7b9e;">手动添加分类：</span>
+    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+      <span style="font-size:0.85rem; color:#6b7b9e; white-space:nowrap;">手动添加分类：</span>
       <input id="customCategory" type="text" placeholder="例如：🎮 游戏"
-        style="flex:1; border:1px solid #e6ecf5; border-radius:12px; padding:0.5rem 0.8rem; font-family:inherit; font-size:0.9rem; outline:none;">
+        style="flex:1; min-width:120px; border:1px solid #e6ecf5; border-radius:12px; padding:0.5rem 0.8rem; font-family:inherit; font-size:0.9rem; outline:none;">
       <button class="btn" id="addCategoryBtn">添加</button>
     </div>
   </div>
@@ -130,10 +158,13 @@
   <!-- 账目表格 -->
   <div class="card">
     <div class="toolbar">
-      <button class="btn btn-primary" id="addRowBtn">＋ 加一行</button>
-      <button class="btn" id="addColBtn">＋ 加一列</button>
+      <button class="btn btn-edit-active" id="toggleModeBtn">✏️ 记账模式</button>
+      <button class="btn" id="undoBtn" style="display:none;">↩️ 撤销删除</button>
+      
       <span style="flex:1"></span>
-      <button class="btn btn-danger" id="clearBtn">清空所有数据</button>
+      <button class="btn btn-primary" id="addRowBtn">＋ 行</button>
+      <button class="btn" id="addColBtn">＋ 列</button>
+      <button class="btn btn-danger" id="clearBtn">清空</button>
     </div>
     <div class="table-wrap">
       <table id="ledgerTable">
@@ -152,7 +183,7 @@
 
 <script>
 (function() {
-  const STORAGE_KEY = 'asakim_ledger_v1';
+  const STORAGE_KEY = 'asakim_ledger_v2';
 
   // ---------- 默认结构 ----------
   const DEFAULT_DATA = {
@@ -165,6 +196,8 @@
   };
 
   let state = load();
+  let isDeleteMode = false; // 默认记账模式
+  let deletedData = null; // 用于撤销：{ type: 'row'|'col', index: 1, data: ... }
 
   function load() {
     try {
@@ -195,44 +228,77 @@
     renderBody();
     renderTotal();
     renderEmojiPanel();
+    updateToolbar();
   }
 
-    function renderHead() {
+  function updateToolbar() {
+    const modeBtn = document.getElementById('toggleModeBtn');
+    const undoBtn = document.getElementById('undoBtn');
+    
+    if (isDeleteMode) {
+      modeBtn.innerHTML = '🗑️ 删除模式';
+      modeBtn.className = 'btn btn-mode-active';
+      undoBtn.style.display = deletedData ? 'flex' : 'none';
+    } else {
+      modeBtn.innerHTML = '✏️ 记账模式';
+      modeBtn.className = 'btn btn-edit-active';
+      undoBtn.style.display = 'none';
+    }
+  }
+
+  function renderHead() {
     const thead = document.getElementById('tableHead');
     thead.innerHTML = '';
     const tr = document.createElement('tr');
+    
     state.columns.forEach((col, ci) => {
       const th = document.createElement('th');
-      th.setAttribute('contenteditable', 'true'); // 关键：直接允许编辑
-      th.textContent = col;
-      th.style.cursor = 'text';
-      th.style.outline = 'none';
-      th.title = '点击直接修改列名'; // 鼠标悬停提示
-
-      // 打字时实时保存
-      th.addEventListener('input', function() {
-        state.columns[ci] = this.textContent;
-        save();
-      });
-
-      // 失去焦点时，防止用户把名字删空
-      th.addEventListener('blur', function() {
-        if (this.textContent.trim() === '') {
-          this.textContent = '未命名';
-          state.columns[ci] = '未命名';
-        } else {
-          state.columns[ci] = this.textContent.trim();
-        }
-        save();
-        renderTotal(); // 以防修改了“金额”相关的列名
-      });
-
+      
+      // 包裹一层用于定位删除按钮
+      const textSpan = document.createElement('span');
+      textSpan.textContent = col;
+      textSpan.style.display = 'inline-block';
+      
+      if (!isDeleteMode) {
+        // 普通模式可编辑表头
+        th.setAttribute('contenteditable', 'true');
+        th.style.outline = 'none';
+        th.addEventListener('input', function() {
+          state.columns[ci] = textSpan.textContent;
+          save();
+        });
+        th.addEventListener('blur', function() {
+          if (textSpan.textContent.trim() === '') {
+            textSpan.textContent = '未命名';
+            state.columns[ci] = '未命名';
+          } else {
+            state.columns[ci] = textSpan.textContent.trim();
+          }
+          save();
+          renderTotal();
+        });
+        th.appendChild(textSpan);
+      } else {
+        // 删除模式不可编辑，且显示删除列按钮
+        th.style.cursor = 'default';
+        th.appendChild(textSpan);
+        
+        const colDelBtn = document.createElement('button');
+        colDelBtn.className = 'col-del-btn';
+        colDelBtn.textContent = '✕';
+        colDelBtn.title = '删除此列';
+        colDelBtn.addEventListener('click', function() {
+          deleteColumn(ci);
+        });
+        th.appendChild(colDelBtn);
+      }
+      
       tr.appendChild(th);
     });
+    
     // 操作列头
     const thOp = document.createElement('th');
-    thOp.textContent = '';
-    thOp.style.width = '40px';
+    thOp.className = 'action-col';
     tr.appendChild(thOp);
     thead.appendChild(tr);
   }
@@ -253,96 +319,82 @@
 
     state.rows.forEach((row, ri) => {
       const tr = document.createElement('tr');
-      // 确保单元格数量与列数一致
       while (row.cells.length < state.columns.length) row.cells.push('');
 
       row.cells.forEach((cellVal, ci) => {
         const td = document.createElement('td');
-        td.setAttribute('contenteditable', 'true');
-        td.textContent = cellVal;
-        td.dataset.row = ri;
-        td.dataset.col = ci;
-
-        // 如果之前保存过颜色，恢复
-        if (row.colors && row.colors[ci]) {
-          td.style.color = row.colors[ci];
-        }
-
-        // 输入时保存
-        td.addEventListener('input', function() {
-          state.rows[ri].cells[ci] = this.textContent;
-          save();
-          if (ci === amountColumnIndex()) renderTotal();
-        });
-
-        // 失焦时清理空白
-        td.addEventListener('blur', function() {
-          if (this.textContent.trim() === '') {
-            this.textContent = '';
-            state.rows[ri].cells[ci] = '';
+        
+        if (!isDeleteMode) {
+          td.setAttribute('contenteditable', 'true');
+          td.addEventListener('input', function() {
+            state.rows[ri].cells[ci] = this.textContent;
             save();
-          }
-        });
-
-        // 点击时记录当前选中单元格，供 emoji 面板使用
-        td.addEventListener('click', function() {
-          window._activeCell = { ri, ci, el: this };
-        });
+            if (ci === amountColumnIndex()) renderTotal();
+          });
+          td.addEventListener('blur', function() {
+            if (this.textContent.trim() === '') {
+              this.textContent = '';
+              state.rows[ri].cells[ci] = '';
+              save();
+            }
+          });
+          td.addEventListener('click', function() {
+            window._activeCell = { ri, ci, el: this };
+          });
+        } else {
+          td.setAttribute('contenteditable', 'false');
+        }
+        
+        td.textContent = cellVal;
+        if (row.colors && row.colors[ci]) td.style.color = row.colors[ci];
+        if (row.rowColor) td.style.color = row.rowColor;
 
         tr.appendChild(td);
       });
 
-      // 每一行的单元格下方附加颜色选择器（放在一个包裹里更整洁）
-      // 为了不破坏表格结构，我们把颜色选择器放到“操作列”中
-            const tdOp = document.createElement('td');
-      tdOp.style.width = '36px'; // 固定操作列的宽度
-      tdOp.style.padding = '4px 0';
+      // 操作列
+      const tdOp = document.createElement('td');
+      tdOp.className = 'action-col';
       
       const tools = document.createElement('div');
-      tools.className = 'cell-tools'; // 用上我们刚写的上下排列样式
+      tools.className = 'cell-tools';
 
-      const colorInput = document.createElement('input');
-      colorInput.type = 'color';
-      colorInput.className = 'color-input';
-      colorInput.title = '修改本行字体颜色';
-      colorInput.value = row.rowColor || '#1e2b4f';
-      colorInput.addEventListener('input', function() {
-        const color = this.value;
-        state.rows[ri].rowColor = color;
-        const trEl = this.closest('tr');
-        trEl.querySelectorAll('td[contenteditable]').forEach(tdEl => {
-          tdEl.style.color = color;
+      if (!isDeleteMode) {
+        // 记账模式：只显示圆润的颜色选择器
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.className = 'color-input';
+        colorInput.title = '修改本行字体颜色';
+        colorInput.value = row.rowColor || '#1e2b4f';
+        colorInput.addEventListener('input', function() {
+          const color = this.value;
+          state.rows[ri].rowColor = color;
+          const trEl = this.closest('tr');
+          trEl.querySelectorAll('td[contenteditable]').forEach(tdEl => {
+            tdEl.style.color = color;
+          });
+          save();
         });
-        save();
-      });
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'row-del';
-      delBtn.textContent = '✕';
-      delBtn.title = '删除这一行';
-      delBtn.addEventListener('click', function() {
-        state.rows.splice(ri, 1);
-        save(); render();
-      });
-
-      // 把颜色和删除放进 tools 里，再把 tools 放进 tdOp
-      tools.appendChild(colorInput);
-      tools.appendChild(delBtn);
-      tdOp.appendChild(tools);
-      tr.appendChild(tdOp);
-      // 恢复整行颜色
-      if (row.rowColor) {
-        tr.querySelectorAll('td[contenteditable]').forEach(tdEl => {
-          tdEl.style.color = row.rowColor;
+        tools.appendChild(colorInput);
+      } else {
+        // 删除模式：只显示删除行按钮
+        const delBtn = document.createElement('button');
+        delBtn.className = 'action-btn-del';
+        delBtn.textContent = '✕';
+        delBtn.title = '删除这一行';
+        delBtn.addEventListener('click', function() {
+          deleteRow(ri);
         });
+        tools.appendChild(delBtn);
       }
 
+      tdOp.appendChild(tools);
+      tr.appendChild(tdOp);
       tbody.appendChild(tr);
     });
   }
 
   function amountColumnIndex() {
-    // 找“金额”列的位置，找不到就用最后一列
     const idx = state.columns.findIndex(c => c.includes('金额'));
     return idx >= 0 ? idx : state.columns.length - 1;
   }
@@ -366,6 +418,7 @@
       chip.className = 'emoji-chip';
       chip.textContent = text;
       chip.addEventListener('click', function() {
+        if (isDeleteMode) return alert('请先切换到记账模式');
         const active = window._activeCell;
         if (active && active.el) {
           active.el.textContent = text;
@@ -380,16 +433,65 @@
     });
   }
 
-  // ---------- 操作 ----------
+  // ---------- 核心操作（删除与撤销） ----------
+  
+  function deleteRow(index) {
+    // 备份数据
+    deletedData = {
+      type: 'row',
+      index: index,
+      data: JSON.parse(JSON.stringify(state.rows[index]))
+    };
+    state.rows.splice(index, 1);
+    save(); render();
+  }
+
+  function deleteColumn(index) {
+    if (state.columns.length <= 1) return alert('至少需要保留一列');
+    
+    // 备份数据
+    const colName = state.columns[index];
+    const colCells = state.rows.map(row => row.cells[index]);
+    deletedData = {
+      type: 'col',
+      index: index,
+      colName: colName,
+      data: colCells
+    };
+    
+    // 执行删除
+    state.columns.splice(index, 1);
+    state.rows.forEach(row => row.cells.splice(index, 1));
+    save(); render();
+  }
+
+  document.getElementById('undoBtn').addEventListener('click', function() {
+    if (!deletedData) return;
+    
+    if (deletedData.type === 'row') {
+      state.rows.splice(deletedData.index, 0, deletedData.data);
+    } else if (deletedData.type === 'col') {
+      state.columns.splice(deletedData.index, 0, deletedData.colName);
+      state.rows.forEach((row, i) => {
+        row.cells.splice(deletedData.index, 0, deletedData.data[i] || '');
+      });
+    }
+    
+    deletedData = null; // 撤销后清空记录，只能撤销一次
+    save(); render();
+  });
+
+  document.getElementById('toggleModeBtn').addEventListener('click', function() {
+    isDeleteMode = !isDeleteMode;
+    if (!isDeleteMode) deletedData = null; // 切回记账模式时取消撤销缓存
+    render();
+  });
+
+  // 原有的添加逻辑
   document.getElementById('addRowBtn').addEventListener('click', function() {
     const cells = new Array(state.columns.length).fill('');
     state.rows.push({ cells });
     save(); render();
-    // 滚动到新行
-    setTimeout(() => {
-      const rows = document.querySelectorAll('#tableBody tr');
-      if (rows.length) rows[rows.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 50);
   });
 
   document.getElementById('addColBtn').addEventListener('click', function() {
@@ -401,11 +503,12 @@
   document.getElementById('clearBtn').addEventListener('click', function() {
     if (!confirm('确定清空所有账目吗？此操作不可撤销。')) return;
     state = JSON.parse(JSON.stringify(DEFAULT_DATA));
+    deletedData = null;
     save(); render();
   });
 
-  // 手动添加分类
   document.getElementById('addCategoryBtn').addEventListener('click', function() {
+    if (isDeleteMode) return alert('请先切换到记账模式');
     const input = document.getElementById('customCategory');
     const val = input.value.trim();
     if (!val) return;
@@ -420,18 +523,6 @@
     input.value = '';
   });
 
-  document.getElementById('customCategory').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') document.getElementById('addCategoryBtn').click();
-  });
-
-  // 点击表格空白处清除 activeCell 标记（可选，避免误填）
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('td[contenteditable="true"]')) {
-      // 不立即清除，给 emoji 按钮留出点击时间
-    }
-  });
-
-  // ---------- 初始化 ----------
   render();
 })();
 </script>
