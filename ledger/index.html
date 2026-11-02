@@ -56,8 +56,9 @@
     .btn-danger:hover { background: #fbe4e2; }
     
     /* 模式按钮 */
-    .btn-mode-active { background: #fdf0ef; color: #c0392b; border-color: #e8c4c0; }
-    .btn-edit-active { background: #1e2b4f; color: white; border-color: #1e2b4f; }
+    .btn-mode-active { background: #1e2b4f; color: white; border-color: #1e2b4f; }
+    .btn-del-active { background: #fdf0ef; color: #c0392b; border-color: #e8c4c0; }
+    .btn-sort-active { background: #e0f2fe; color: #0284c7; border-color: #bae6fd; }
 
     /* Emoji 快捷面板 */
     .emoji-panel { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; min-height: 30px; }
@@ -100,7 +101,7 @@
     td.auto-amount { color: #6b7b9e; font-weight: 500; background: #f9fbfe; }
 
     /* 操作列 */
-    .action-col { width: 44px; padding: 4px 0; text-align: center; }
+    .action-col { width: 60px; padding: 4px 0; text-align: center; }
     
     /* 展开/收起按钮 */
     .btn-toggle {
@@ -116,6 +117,15 @@
       border-radius: 50%;
     }
     .action-btn-del:hover { background: #fdf0ef; }
+
+    /* 排序按钮 */
+    .sort-controls { display: flex; gap: 4px; justify-content: center; }
+    .btn-sort {
+      background: #f9fbfe; border: 1px solid #e6ecf5; border-radius: 4px;
+      color: #1e2b4f; cursor: pointer; padding: 2px 6px; font-size: 1rem;
+    }
+    .btn-sort:hover:not(:disabled) { background: #edf2fa; border-color: #b7c9e8; }
+    .btn-sort:disabled { opacity: 0.3; cursor: not-allowed; }
 
     /* 表头列删除 */
     .col-del-btn {
@@ -212,8 +222,11 @@
   <!-- 账目表格 -->
   <div class="card">
     <div class="toolbar">
-      <button class="btn btn-edit-active" id="toggleModeBtn">✏️ 记账模式</button>
-      <button class="btn" id="undoRowBtn" style="display:none;">↩️ 撤销删行</button>
+      <button class="btn btn-mode-active" id="modeEditBtn">✏️ 记账模式</button>
+      <button class="btn" id="modeDelBtn">🗑️ 删除模式</button>
+      <button class="btn" id="modeSortBtn">🔃 排序模式</button>
+      
+      <button class="btn" id="undoRowBtn" style="display:none; margin-left: 10px;">↩️ 撤销</button>
       <span style="flex:1"></span>
       <button class="btn btn-primary" id="addRowBtn">＋ 行</button>
       <button class="btn" id="addColBtn">＋ 列</button>
@@ -274,10 +287,11 @@
   }
 
   let state = load();
-  let isDeleteMode = false;
-  let isDelEmojiMode = false;
   
-  // 升级为数组，用于保存多次撤销记录
+  // 三种模式：'edit'(记账), 'delete'(删除), 'sort'(排序)
+  let currentMode = 'edit'; 
+  
+  let isDelEmojiMode = false;
   let deletedRowDataStack = []; 
   let deletedLedgerData = null; 
   let deletedEmojiDataStack = [];
@@ -367,28 +381,27 @@
 
   // ===== 更新工具栏状态 =====
   function updateToolbar() {
-    const modeBtn = document.getElementById('toggleModeBtn');
+    const modeEditBtn = document.getElementById('modeEditBtn');
+    const modeDelBtn = document.getElementById('modeDelBtn');
+    const modeSortBtn = document.getElementById('modeSortBtn');
     const undoRowBtn = document.getElementById('undoRowBtn');
     
-    if (isDeleteMode) {
-      modeBtn.innerHTML = '🗑️ 删除模式';
-      modeBtn.className = 'btn btn-mode-active';
-      
-      if (deletedRowDataStack.length > 0) {
-        undoRowBtn.style.display = 'flex';
-        // 获取最新一次删除的类型和剩余次数
-        const lastAction = deletedRowDataStack[deletedRowDataStack.length - 1];
-        const actionName = lastAction.type === 'parent' ? '删大类' : '删明细';
-        undoRowBtn.innerHTML = `↩️ 撤销${actionName} (${deletedRowDataStack.length})`;
-      } else {
-        undoRowBtn.style.display = 'none';
-      }
+    // 按钮高亮状态
+    modeEditBtn.className = currentMode === 'edit' ? 'btn btn-mode-active' : 'btn';
+    modeDelBtn.className = currentMode === 'delete' ? 'btn btn-del-active' : 'btn';
+    modeSortBtn.className = currentMode === 'sort' ? 'btn btn-sort-active' : 'btn';
+
+    // 撤销按钮逻辑（只在删除模式显示）
+    if (currentMode === 'delete' && deletedRowDataStack.length > 0) {
+      undoRowBtn.style.display = 'flex';
+      const lastAction = deletedRowDataStack[deletedRowDataStack.length - 1];
+      const actionName = lastAction.type === 'parent' ? '删大类' : '删明细';
+      undoRowBtn.innerHTML = `↩️ 撤销${actionName} (${deletedRowDataStack.length})`;
     } else {
-      modeBtn.innerHTML = '✏️ 记账模式';
-      modeBtn.className = 'btn btn-edit-active';
       undoRowBtn.style.display = 'none';
     }
     
+    // 标签删除逻辑
     const delEmojiBtn = document.getElementById('toggleDelEmojiBtn');
     const undoEmojiBtn = document.getElementById('undoEmojiBtn');
     if (isDelEmojiMode) {
@@ -421,7 +434,7 @@
           if (!confirm(`确定要删除标签【${text}】吗？`)) return;
           
           deletedEmojiDataStack.push({ index: index, text: text });
-          if (deletedEmojiDataStack.length > 3) deletedEmojiDataStack.shift(); // 最多保留3次
+          if (deletedEmojiDataStack.length > 3) deletedEmojiDataStack.shift();
           
           state.emojis.splice(index, 1);
           save(); render();
@@ -429,7 +442,7 @@
       } else {
         chip.textContent = text;
         chip.addEventListener('click', function() {
-          if (isDeleteMode) return alert('请先切换到记账模式');
+          if (currentMode !== 'edit') return alert('请先切换到记账模式');
           const active = window._activeCell;
           if (active && active.el) {
             active.el.textContent = text;
@@ -463,7 +476,7 @@
     ledger.columns.forEach((col, ci) => {
       const th = document.createElement('th');
       
-      if (!isDeleteMode) {
+      if (currentMode === 'edit') {
         th.textContent = col;
         th.setAttribute('contenteditable', 'true');
         th.style.outline = 'none';
@@ -482,7 +495,7 @@
           }
           save(); renderTotal();
         });
-      } else {
+      } else if (currentMode === 'delete') {
         th.style.cursor = 'default';
         const textSpan = document.createElement('span');
         textSpan.textContent = col;
@@ -503,12 +516,18 @@
           save(); render();
         });
         th.appendChild(colDelBtn);
+      } else {
+        // 排序模式：只读
+        th.textContent = col;
+        th.setAttribute('contenteditable', 'false');
+        th.style.cursor = 'default';
       }
       tr.appendChild(th);
     });
     
     const thOp = document.createElement('th');
     thOp.className = 'action-col';
+    if (currentMode === 'sort') thOp.textContent = '上下移';
     tr.appendChild(thOp);
     thead.appendChild(tr);
   }
@@ -550,7 +569,7 @@
         const td = document.createElement('td');
         const isAutoAmount = (ci === amtIdx && hasChildren);
         
-        if (!isDeleteMode && !isAutoAmount) {
+        if (currentMode === 'edit' && !isAutoAmount) {
           td.setAttribute('contenteditable', 'true');
           td.addEventListener('input', function() {
             row.cells[ci] = this.textContent;
@@ -577,7 +596,7 @@
       const tdOp = document.createElement('td');
       tdOp.className = 'action-col';
       
-      if (!isDeleteMode) {
+      if (currentMode === 'edit') {
         const toggleBtn = document.createElement('button');
         toggleBtn.className = 'btn-toggle';
         toggleBtn.textContent = row.isExpanded ? '▼' : '▶';
@@ -586,25 +605,43 @@
           save(); render();
         });
         tdOp.appendChild(toggleBtn);
-      } else {
+      } else if (currentMode === 'delete') {
         const delBtn = document.createElement('button');
         delBtn.className = 'action-btn-del';
         delBtn.textContent = '✕';
         delBtn.addEventListener('click', () => {
-          // 记录删除的大类，入栈
           deletedRowDataStack.push({ type: 'parent', parentIndex: ri, data: JSON.parse(JSON.stringify(row)) });
-          if (deletedRowDataStack.length > 3) deletedRowDataStack.shift(); // 最多保留3步
-          
+          if (deletedRowDataStack.length > 3) deletedRowDataStack.shift();
           ledger.rows.splice(ri, 1);
           save(); render();
         });
         tdOp.appendChild(delBtn);
+      } else if (currentMode === 'sort') {
+        const ctrlWrap = document.createElement('div');
+        ctrlWrap.className = 'sort-controls';
+        
+        const upBtn = document.createElement('button');
+        upBtn.className = 'btn-sort';
+        upBtn.textContent = '↑';
+        upBtn.disabled = (ri === 0);
+        upBtn.addEventListener('click', () => moveRow(ri, -1));
+        
+        const downBtn = document.createElement('button');
+        downBtn.className = 'btn-sort';
+        downBtn.textContent = '↓';
+        downBtn.disabled = (ri === ledger.rows.length - 1);
+        downBtn.addEventListener('click', () => moveRow(ri, 1));
+        
+        ctrlWrap.appendChild(upBtn);
+        ctrlWrap.appendChild(downBtn);
+        tdOp.appendChild(ctrlWrap);
       }
 
       tr.appendChild(tdOp);
       tbody.appendChild(tr);
 
-      if (row.isExpanded) {
+      // 只有在非排序模式下才渲染子行
+      if (currentMode !== 'sort' && row.isExpanded) {
         if (dateColIdx > -1 && row.children.length > 1) {
           row.children.sort((a, b) => {
             let d1 = a.cells[dateColIdx] || '';
@@ -630,7 +667,7 @@
               dateInput.value = child.cells[ci] || todayStr;
               if (!child.cells[ci]) child.cells[ci] = todayStr;
               
-              if (isDeleteMode) {
+              if (currentMode !== 'edit') {
                 dateInput.disabled = true;
               } else {
                 dateInput.addEventListener('change', function() {
@@ -642,7 +679,7 @@
               childTd.appendChild(dateInput);
             } else {
               childTd.textContent = child.cells[ci] || '';
-              if (!isDeleteMode) {
+              if (currentMode === 'edit') {
                 childTd.setAttribute('contenteditable', 'true');
                 childTd.addEventListener('input', function() {
                   child.cells[ci] = this.textContent;
@@ -664,12 +701,11 @@
 
           const childOp = document.createElement('td');
           childOp.className = 'action-col';
-          if (isDeleteMode) {
+          if (currentMode === 'delete') {
             const delChild = document.createElement('button');
             delChild.className = 'action-btn-del';
             delChild.textContent = '✕';
             delChild.addEventListener('click', () => {
-              // 记录删除的明细，入栈
               deletedRowDataStack.push({ type: 'child', parentIndex: ri, childIndex: cIdx, data: JSON.parse(JSON.stringify(child)) });
               if (deletedRowDataStack.length > 3) deletedRowDataStack.shift();
               
@@ -683,7 +719,7 @@
           tbody.appendChild(childTr);
         });
 
-        if (!isDeleteMode) {
+        if (currentMode === 'edit') {
           const addTr = document.createElement('tr');
           addTr.className = 'child-row add-child-row';
           const addTd = document.createElement('td');
@@ -704,6 +740,20 @@
         }
       }
     });
+  }
+
+  // ===== 移动行逻辑 =====
+  function moveRow(index, direction) {
+    const ledger = getLedger();
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= ledger.rows.length) return;
+    
+    // 交换位置
+    const temp = ledger.rows[index];
+    ledger.rows[index] = ledger.rows[targetIndex];
+    ledger.rows[targetIndex] = temp;
+    
+    save(); render();
   }
 
   function updateParentAmountDisplay(ri) {
@@ -753,7 +803,7 @@
       sum % 1 === 0 ? sum.toString() : sum.toFixed(2);
   }
 
-  // ====== 导航事件 ======
+  // ====== 导航与分类事件 ======
   document.getElementById('yearSelect').addEventListener('change', function() {
     state.currentYear = parseInt(this.value);
     deletedRowDataStack = []; deletedLedgerData = null; 
@@ -836,7 +886,6 @@
     save(); render();
   });
 
-  // ====== 标签增删事件 ======
   document.getElementById('addEmojiBtn').addEventListener('click', function() {
     if (isDelEmojiMode) return alert('请先取消删除模式');
     const newTag = prompt('请输入新的标签名称（可以带 Emoji）:');
@@ -859,11 +908,25 @@
     save(); render();
   });
 
-  // ====== 表格事件 ======
+  // ====== 表格模式切换 ======
+  document.getElementById('modeEditBtn').addEventListener('click', function() {
+    currentMode = 'edit';
+    render();
+  });
+  
+  document.getElementById('modeDelBtn').addEventListener('click', function() {
+    currentMode = 'delete';
+    render();
+  });
+  
+  document.getElementById('modeSortBtn').addEventListener('click', function() {
+    currentMode = 'sort';
+    deletedRowDataStack = []; // 切换模式清空撤销记录
+    render();
+  });
+
   document.getElementById('undoRowBtn').addEventListener('click', function() {
     if (deletedRowDataStack.length === 0) return;
-    
-    // 从栈顶取出最近一次操作
     const action = deletedRowDataStack.pop();
     const ledger = getLedger();
     
@@ -876,17 +939,11 @@
         parentRow.isExpanded = true;
       }
     }
-    
     save(); render();
   });
 
-  document.getElementById('toggleModeBtn').addEventListener('click', function() {
-    isDeleteMode = !isDeleteMode;
-    if (!isDeleteMode) deletedRowDataStack = [];
-    render();
-  });
-
   document.getElementById('addRowBtn').addEventListener('click', function() {
+    if (currentMode !== 'edit') return;
     const ledger = getLedger();
     const cells = new Array(ledger.columns.length).fill('');
     ledger.rows.push({ cells, children: [], isExpanded: false });
@@ -894,6 +951,7 @@
   });
 
   document.getElementById('addColBtn').addEventListener('click', function() {
+    if (currentMode !== 'edit') return;
     const ledger = getLedger();
     ledger.columns.push('新列');
     ledger.rows.forEach(row => {
@@ -904,6 +962,7 @@
   });
 
   document.getElementById('clearBtn').addEventListener('click', function() {
+    if (currentMode !== 'edit') return;
     if (!confirm('确定清空本账本所有数据吗？此操作不可撤销。')) return;
     state.years[state.currentYear][state.currentMonth] = JSON.parse(JSON.stringify(DEFAULT_LEDGER_DATA));
     deletedRowDataStack = [];
