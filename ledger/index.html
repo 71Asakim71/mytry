@@ -178,22 +178,36 @@
     renderEmojiPanel();
   }
 
-  function renderHead() {
+    function renderHead() {
     const thead = document.getElementById('tableHead');
     thead.innerHTML = '';
     const tr = document.createElement('tr');
     state.columns.forEach((col, ci) => {
       const th = document.createElement('th');
+      th.setAttribute('contenteditable', 'true'); // 关键：直接允许编辑
       th.textContent = col;
-      // 列头也可编辑
       th.style.cursor = 'text';
-      th.addEventListener('dblclick', function() {
-        const newName = prompt('修改列名', col);
-        if (newName !== null && newName.trim() !== '') {
-          state.columns[ci] = newName.trim();
-          save(); render();
-        }
+      th.style.outline = 'none';
+      th.title = '点击直接修改列名'; // 鼠标悬停提示
+
+      // 打字时实时保存
+      th.addEventListener('input', function() {
+        state.columns[ci] = this.textContent;
+        save();
       });
+
+      // 失去焦点时，防止用户把名字删空
+      th.addEventListener('blur', function() {
+        if (this.textContent.trim() === '') {
+          this.textContent = '未命名';
+          state.columns[ci] = '未命名';
+        } else {
+          state.columns[ci] = this.textContent.trim();
+        }
+        save();
+        renderTotal(); // 以防修改了“金额”相关的列名
+      });
+
       tr.appendChild(th);
     });
     // 操作列头
