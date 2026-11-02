@@ -14,7 +14,7 @@
       padding: 2rem 1rem;
     }
     .container { max-width: 960px; margin: 0 auto; }
-    header { text-align: center; margin-bottom: 2rem; }
+    header { text-align: center; margin-bottom: 1.5rem; }
     header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
     header p { color: #6b7b9e; margin-top: 0.4rem; font-size: 0.95rem; }
     .back-link {
@@ -29,6 +29,17 @@
       border: 1px solid #e6ecf5; margin-bottom: 1.5rem;
     }
     .card-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }
+
+    /* 账本导航栏 */
+    .ledger-nav {
+      display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;
+    }
+    .select-box {
+      border: 1px solid #e6ecf5; background: #f9fbfe; border-radius: 12px;
+      padding: 0.45rem 0.8rem; font-family: inherit; font-size: 0.9rem;
+      color: #1e2b4f; outline: none; cursor: pointer; transition: all 0.2s;
+    }
+    .select-box:hover { background: #edf2fa; border-color: #b7c9e8; }
 
     /* 工具栏 */
     .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; align-items: center; }
@@ -118,6 +129,15 @@
     }
     .btn-text-add:hover { color: #1e2b4f; background: #edf2fa; }
 
+    /* 日期选择器样式 */
+    .child-date-input {
+      border: 1px solid transparent; border-radius: 6px; padding: 4px;
+      font-family: inherit; font-size: 0.85rem; color: #1e2b4f;
+      background: transparent; width: 100%; min-width: 110px;
+    }
+    .child-date-input:focus { background: #f0f4fb; border-color: #b7c9e8; outline: none; }
+    .child-date-input:disabled { color: #9aaac9; }
+
     /* 总计 */
     .total-bar {
       display: flex; justify-content: flex-end; align-items: baseline; gap: 0.6rem;
@@ -134,14 +154,15 @@
       .toolbar > span[style*="flex:1"] { display: none; }
       .toolbar { gap: 0.4rem; }
       .btn { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
+      .select-box { padding: 0.4rem 0.5rem; font-size: 0.8rem; }
       th, td { padding: 0.5rem 0.3rem; font-size: 0.85rem; }
+      
       /* 固定第一列 */
       th:first-child, td:first-child {
         position: sticky; left: 0; background: white; z-index: 2;
         box-shadow: 2px 0 4px -2px rgba(0,0,0,0.05);
       }
       th:first-child { z-index: 3; }
-      /* 子账单第一列背景保持适配 */
       .child-row td:first-child { background: #fafbfc; }
     }
   </style>
@@ -154,24 +175,37 @@
     <p>支持分项记录，自动汇总计算</p>
   </header>
 
+  <!-- 账本导航 -->
+  <div class="card">
+    <div class="ledger-nav">
+      <select id="yearSelect" class="select-box"></select>
+      <select id="monthSelect" class="select-box"></select>
+      <button class="btn" id="addYearBtn">＋ 年</button>
+      <button class="btn btn-danger" id="delYearBtn">✕ 删年</button>
+      <button class="btn" id="addMonthBtn">＋ 月</button>
+      <button class="btn btn-danger" id="delMonthBtn">✕ 删月</button>
+      
+      <button class="btn" id="undoLedgerBtn" style="display:none; margin-left: auto; color: #c0392b; background: #fdf0ef;">↩️ 撤销删账本</button>
+    </div>
+  </div>
+
+  <!-- 分类面板 -->
   <div class="card">
     <div class="card-title">🍽️ 分类快捷填入</div>
-    <p style="color:#7b8aa6; font-size:0.85rem; margin-bottom:0.8rem;">
-      点击标签填入当前选中的单元格。
-    </p>
     <div class="emoji-panel" id="emojiPanel"></div>
     <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-      <span style="font-size:0.85rem; color:#6b7b9e; white-space:nowrap;">手动添加分类：</span>
+      <span style="font-size:0.85rem; color:#6b7b9e; white-space:nowrap;">手动添加：</span>
       <input id="customCategory" type="text" placeholder="例如：🎮 游戏"
         style="flex:1; min-width:120px; border:1px solid #e6ecf5; border-radius:12px; padding:0.5rem 0.8rem; font-family:inherit; font-size:0.9rem; outline:none;">
       <button class="btn" id="addCategoryBtn">添加</button>
     </div>
   </div>
 
+  <!-- 账目表格 -->
   <div class="card">
     <div class="toolbar">
       <button class="btn btn-edit-active" id="toggleModeBtn">✏️ 记账模式</button>
-      <button class="btn" id="undoBtn" style="display:none;">↩️ 撤销删除</button>
+      <button class="btn" id="undoRowBtn" style="display:none;">↩️ 撤销删行</button>
       <span style="flex:1"></span>
       <button class="btn btn-primary" id="addRowBtn">＋ 行</button>
       <button class="btn" id="addColBtn">＋ 列</button>
@@ -184,7 +218,7 @@
       </table>
     </div>
     <div class="total-bar">
-      <span style="color:#6b7b9e;">总计</span>
+      <span style="color:#6b7b9e;">本月总计</span>
       <span class="total-amount" id="totalDisplay">0</span>
     </div>
   </div>
@@ -194,50 +228,91 @@
 
 <script>
 (function() {
-  const STORAGE_KEY = 'asakim_ledger_v2';
+  const STORAGE_KEY = 'asakim_ledger_v3'; // 升级了版本号
 
-  const DEFAULT_DATA = {
+  const DEFAULT_LEDGER_DATA = {
     columns: ['日期', '分类', '名称', '金额'],
     rows: [
       { cells: ['', '🍚 早餐', '豆浆油条', '8'], children: [], isExpanded: false },
-      { cells: ['', '🍜 午餐', '牛肉面', '22'], children: [], isExpanded: false },
-      { cells: ['', '🧋 奶茶', '', '15'], children: [], isExpanded: false }
+      { cells: ['', '🍜 午餐', '牛肉面', '22'], children: [], isExpanded: false }
     ]
   };
 
+  // 获取今天日期字符串 YYYY-MM-DD
+  function getTodayStr() {
+    const today = new Date();
+    return today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  }
+
+  // 初始化状态结构
+  function getInitState() {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth() + 1;
+    return {
+      currentYear: y,
+      currentMonth: m,
+      years: {
+        [y]: {
+          [m]: JSON.parse(JSON.stringify(DEFAULT_LEDGER_DATA))
+        }
+      }
+    };
+  }
+
   let state = load();
   let isDeleteMode = false;
-  let deletedData = null;
+  let deletedRowData = null;
+  let deletedLedgerData = null; // 记录删除的年/月
 
   function load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed.columns && parsed.rows) {
-          parsed.rows.forEach(row => {
-            if (!row.children) row.children = [];
-            if (row.isExpanded === undefined) row.isExpanded = false;
-          });
-          return parsed;
-        }
+        if (parsed.currentYear && parsed.years) return parsed;
       }
     } catch (e) {}
-    return JSON.parse(JSON.stringify(DEFAULT_DATA));
+    
+    // 检查是否有旧版数据 (asakim_ledger_v2)
+    try {
+      const oldRaw = localStorage.getItem('asakim_ledger_v2');
+      if (oldRaw) {
+        const oldParsed = JSON.parse(oldRaw);
+        if (oldParsed.columns && oldParsed.rows) {
+           const init = getInitState();
+           init.years[init.currentYear][init.currentMonth] = oldParsed;
+           return init;
+        }
+      }
+    } catch(e) {}
+
+    return getInitState();
   }
 
   function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
+  // 获取当前账本数据
+  function getLedger() {
+    const y = state.currentYear;
+    const m = state.currentMonth;
+    if (!state.years[y]) state.years[y] = {};
+    if (!state.years[y][m]) {
+      state.years[y][m] = JSON.parse(JSON.stringify(DEFAULT_LEDGER_DATA));
+    }
+    return state.years[y][m];
+  }
+
   const EMOJIS = [
     '🍚 早餐', '🍜 午餐', '🍽️ 晚餐', '🧋 奶茶', '☕ 咖啡',
     '🚌 交通', '🛒 购物', '🏠 房租', '💡 水电', '📱 话费',
-    '🎮 游戏', '📚 书籍', '💊 医疗', '🎁 礼物', '✈️ 旅行',
-    '🐱 宠物', '👕 服饰', '🧴 日用品', '💰 工资', '🧧 红包'
+    '🎮 游戏', '📚 书籍', '💊 医疗', '🎁 礼物', '✈️ 旅行'
   ];
 
   function render() {
+    renderNav();
     renderHead();
     renderBody();
     renderTotal();
@@ -245,13 +320,52 @@
     updateToolbar();
   }
 
+  // ===== 导航栏渲染 =====
+  function renderNav() {
+    const yearSelect = document.getElementById('yearSelect');
+    const monthSelect = document.getElementById('monthSelect');
+    
+    // 渲染年份
+    yearSelect.innerHTML = '';
+    if (!state.years[state.currentYear]) state.years[state.currentYear] = {};
+    
+    const years = Object.keys(state.years).sort((a,b) => b - a);
+    // 确保当前年份在列表中
+    if (!years.includes(state.currentYear.toString())) {
+      years.push(state.currentYear.toString());
+      years.sort((a,b) => b - a);
+    }
+
+    years.forEach(y => {
+      const opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y + ' 年';
+      if (parseInt(y) === state.currentYear) opt.selected = true;
+      yearSelect.appendChild(opt);
+    });
+
+    // 渲染月份
+    monthSelect.innerHTML = '';
+    for (let i = 1; i <= 12; i++) {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = i + ' 月';
+      if (i === state.currentMonth) opt.selected = true;
+      monthSelect.appendChild(opt);
+    }
+
+    // 撤销按钮状态
+    const undoBtn = document.getElementById('undoLedgerBtn');
+    undoBtn.style.display = deletedLedgerData ? 'inline-block' : 'none';
+  }
+
   function updateToolbar() {
     const modeBtn = document.getElementById('toggleModeBtn');
-    const undoBtn = document.getElementById('undoBtn');
+    const undoBtn = document.getElementById('undoRowBtn');
     if (isDeleteMode) {
       modeBtn.innerHTML = '🗑️ 删除模式';
       modeBtn.className = 'btn btn-mode-active';
-      undoBtn.style.display = deletedData ? 'flex' : 'none';
+      undoBtn.style.display = deletedRowData ? 'flex' : 'none';
     } else {
       modeBtn.innerHTML = '✏️ 记账模式';
       modeBtn.className = 'btn btn-edit-active';
@@ -259,40 +373,37 @@
     }
   }
 
-  // ===== 修复后的表头渲染逻辑 =====
+  // ===== 表头渲染 =====
   function renderHead() {
+    const ledger = getLedger();
     const thead = document.getElementById('tableHead');
     thead.innerHTML = '';
     const tr = document.createElement('tr');
     
-    state.columns.forEach((col, ci) => {
+    ledger.columns.forEach((col, ci) => {
       const th = document.createElement('th');
       
       if (!isDeleteMode) {
-        // 正常模式：直接变成纯文本，直接读取 this.textContent
         th.textContent = col;
         th.setAttribute('contenteditable', 'true');
         th.style.outline = 'none';
         
         th.addEventListener('input', function() {
-          state.columns[ci] = this.textContent;
+          ledger.columns[ci] = this.textContent;
           save();
         });
         
         th.addEventListener('blur', function() {
           if (this.textContent.trim() === '') {
             this.textContent = '未命名';
-            state.columns[ci] = '未命名';
+            ledger.columns[ci] = '未命名';
           } else {
-            state.columns[ci] = this.textContent.trim();
+            ledger.columns[ci] = this.textContent.trim();
           }
-          save(); 
-          renderTotal();
+          save(); renderTotal();
         });
       } else {
-        // 删除模式：不可编辑，包含文字和删除按钮
         th.style.cursor = 'default';
-        
         const textSpan = document.createElement('span');
         textSpan.textContent = col;
         textSpan.style.display = 'inline-block';
@@ -301,14 +412,19 @@
         const colDelBtn = document.createElement('button');
         colDelBtn.className = 'col-del-btn';
         colDelBtn.textContent = '✕';
-        colDelBtn.title = '删除此列';
         colDelBtn.addEventListener('click', function(e) {
           e.stopPropagation();
-          deleteColumn(ci);
+          if(!confirm('确定删除此列吗？')) return;
+          // 简单删除列（直接操作数据）
+          ledger.columns.splice(ci, 1);
+          ledger.rows.forEach(r => {
+            r.cells.splice(ci, 1);
+            if (r.children) r.children.forEach(c => c.cells.splice(ci, 1));
+          });
+          save(); render();
         });
         th.appendChild(colDelBtn);
       }
-      
       tr.appendChild(th);
     });
     
@@ -318,25 +434,29 @@
     thead.appendChild(tr);
   }
 
+  // ===== 主体渲染 =====
   function renderBody() {
+    const ledger = getLedger();
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
-    if (state.rows.length === 0) {
+    if (ledger.rows.length === 0) {
       const tr = document.createElement('tr');
       const td = document.createElement('td');
-      td.colSpan = state.columns.length + 1;
+      td.colSpan = ledger.columns.length + 1;
       td.className = 'empty-hint';
-      td.textContent = '还没有账目，点击上方「加一行」开始记录。';
+      td.textContent = '本月还没有账目，点击上方「＋ 行」开始记录。';
       tr.appendChild(td);
       tbody.appendChild(tr);
       return;
     }
 
     const amtIdx = amountColumnIndex();
+    const dateColIdx = ledger.columns.findIndex(c => c.includes('日期'));
+    const todayStr = getTodayStr();
 
-    state.rows.forEach((row, ri) => {
+    ledger.rows.forEach((row, ri) => {
       const tr = document.createElement('tr');
-      while (row.cells.length < state.columns.length) row.cells.push('');
+      while (row.cells.length < ledger.columns.length) row.cells.push('');
 
       const hasChildren = row.children && row.children.length > 0;
       
@@ -355,7 +475,7 @@
         if (!isDeleteMode && !isAutoAmount) {
           td.setAttribute('contenteditable', 'true');
           td.addEventListener('input', function() {
-            state.rows[ri].cells[ci] = this.textContent;
+            row.cells[ci] = this.textContent;
             save();
             if (ci === amtIdx) renderTotal();
           });
@@ -383,9 +503,8 @@
         const toggleBtn = document.createElement('button');
         toggleBtn.className = 'btn-toggle';
         toggleBtn.textContent = row.isExpanded ? '▼' : '▶';
-        toggleBtn.title = '展开/收起子账单';
         toggleBtn.addEventListener('click', function() {
-          state.rows[ri].isExpanded = !state.rows[ri].isExpanded;
+          row.isExpanded = !row.isExpanded;
           save(); render();
         });
         tdOp.appendChild(toggleBtn);
@@ -393,27 +512,58 @@
         const delBtn = document.createElement('button');
         delBtn.className = 'action-btn-del';
         delBtn.textContent = '✕';
-        delBtn.title = '删除此大类';
-        delBtn.addEventListener('click', () => deleteRow(ri));
+        delBtn.addEventListener('click', () => {
+          deletedRowData = { index: ri, data: JSON.parse(JSON.stringify(row)) };
+          ledger.rows.splice(ri, 1);
+          save(); render();
+        });
         tdOp.appendChild(delBtn);
       }
 
       tr.appendChild(tdOp);
       tbody.appendChild(tr);
 
-      // 渲染子账单
+      // ====== 渲染子账单 ======
       if (row.isExpanded) {
+        // 智能排序：如果有日期列，根据日期倒序排
+        if (dateColIdx > -1 && row.children.length > 1) {
+          row.children.sort((a, b) => {
+            let d1 = a.cells[dateColIdx] || '';
+            let d2 = b.cells[dateColIdx] || '';
+            return d2.localeCompare(d1); // 降序
+          });
+        }
+
         row.children.forEach((child, cIdx) => {
           const childTr = document.createElement('tr');
           childTr.className = 'child-row';
-          while (child.cells.length < state.columns.length) child.cells.push('');
+          while (child.cells.length < ledger.columns.length) child.cells.push('');
 
-          state.columns.forEach((col, ci) => {
+          ledger.columns.forEach((col, ci) => {
             const childTd = document.createElement('td');
             
             if (ci === 0) {
               childTd.innerHTML = '<span class="tree-indent">└</span>';
+            } else if (ci === dateColIdx) {
+              // 日期列特殊处理
+              const dateInput = document.createElement('input');
+              dateInput.type = 'date';
+              dateInput.className = 'child-date-input';
+              dateInput.value = child.cells[ci] || todayStr;
+              if (!child.cells[ci]) child.cells[ci] = todayStr; // 默认填入今天
+              
+              if (isDeleteMode) {
+                dateInput.disabled = true;
+              } else {
+                dateInput.addEventListener('change', function() {
+                  child.cells[ci] = this.value;
+                  save();
+                  render(); // 选完日期立即重新排序
+                });
+              }
+              childTd.appendChild(dateInput);
             } else {
+              // 普通列
               childTd.textContent = child.cells[ci] || '';
               if (!isDeleteMode) {
                 childTd.setAttribute('contenteditable', 'true');
@@ -441,7 +591,6 @@
             const delChild = document.createElement('button');
             delChild.className = 'action-btn-del';
             delChild.textContent = '✕';
-            delChild.title = '删除此明细';
             delChild.addEventListener('click', () => {
               row.children.splice(cIdx, 1);
               if (row.children.length === 0) row.cells[amtIdx] = '';
@@ -457,13 +606,13 @@
           const addTr = document.createElement('tr');
           addTr.className = 'child-row add-child-row';
           const addTd = document.createElement('td');
-          addTd.colSpan = state.columns.length + 1;
+          addTd.colSpan = ledger.columns.length + 1;
           
           const addBtn = document.createElement('button');
           addBtn.className = 'btn-text-add';
           addBtn.textContent = '＋ 添加明细';
           addBtn.addEventListener('click', () => {
-            const emptyCells = new Array(state.columns.length).fill('');
+            const emptyCells = new Array(ledger.columns.length).fill('');
             row.children.push({ cells: emptyCells });
             save(); render();
           });
@@ -477,7 +626,8 @@
   }
 
   function updateParentAmountDisplay(ri) {
-    const row = state.rows[ri];
+    const ledger = getLedger();
+    const row = ledger.rows[ri];
     const amtIdx = amountColumnIndex();
     let sum = 0;
     row.children.forEach(c => {
@@ -498,21 +648,21 @@
   }
 
   function amountColumnIndex() {
-    const idx = state.columns.findIndex(c => c.includes('金额'));
-    return idx >= 0 ? idx : state.columns.length - 1;
+    const ledger = getLedger();
+    const idx = ledger.columns.findIndex(c => c.includes('金额'));
+    return idx >= 0 ? idx : ledger.columns.length - 1;
   }
 
   function renderTotal() {
+    const ledger = getLedger();
     const idx = amountColumnIndex();
     let sum = 0;
-    state.rows.forEach(row => {
+    ledger.rows.forEach(row => {
       if (row.children && row.children.length > 0) {
-        let childSum = 0;
         row.children.forEach(c => {
           let val = parseFloat(c.cells[idx]);
-          if (!isNaN(val)) childSum += val;
+          if (!isNaN(val)) sum += val;
         });
-        sum += childSum;
       } else {
         let val = parseFloat(row.cells[idx]);
         if (!isNaN(val)) sum += val;
@@ -534,14 +684,15 @@
         const active = window._activeCell;
         if (active && active.el) {
           active.el.textContent = text;
+          const ledger = getLedger();
           if (active.isChild) {
-            state.rows[active.ri].children[active.cIdx].cells[active.ci] = text;
+            ledger.rows[active.ri].children[active.cIdx].cells[active.ci] = text;
             if (active.ci === amountColumnIndex()) {
               updateParentAmountDisplay(active.ri);
               renderTotal();
             }
           } else {
-            state.rows[active.ri].cells[active.ci] = text;
+            ledger.rows[active.ri].cells[active.ci] = text;
             renderTotal();
           }
           save();
@@ -553,69 +704,115 @@
     });
   }
 
-  function deleteRow(index) {
-    deletedData = {
-      type: 'row',
-      index: index,
-      data: JSON.parse(JSON.stringify(state.rows[index]))
-    };
-    state.rows.splice(index, 1);
+  // ====== 导航事件 ======
+  document.getElementById('yearSelect').addEventListener('change', function() {
+    state.currentYear = parseInt(this.value);
+    deletedRowData = null; deletedLedgerData = null; // 切换账本清空撤销
     save(); render();
-  }
+  });
 
-  function deleteColumn(index) {
-    if (state.columns.length <= 1) return alert('至少需要保留一列');
-    const colName = state.columns[index];
-    const colCells = state.rows.map(row => row.cells[index]);
-    const childColCells = state.rows.map(row => row.children ? row.children.map(c => c.cells[index]) : []);
+  document.getElementById('monthSelect').addEventListener('change', function() {
+    state.currentMonth = parseInt(this.value);
+    deletedRowData = null; deletedLedgerData = null;
+    save(); render();
+  });
 
-    deletedData = { type: 'col', index: index, colName: colName, data: colCells, childData: childColCells };
+  document.getElementById('addYearBtn').addEventListener('click', function() {
+    const y = prompt('请输入要添加的年份 (如 2024):', new Date().getFullYear() + 1);
+    if (!y || isNaN(y)) return;
+    const yearNum = parseInt(y);
+    if (!state.years[yearNum]) state.years[yearNum] = {};
+    state.currentYear = yearNum;
+    save(); render();
+  });
+
+  document.getElementById('addMonthBtn').addEventListener('click', function() {
+    const m = prompt('请输入要添加的月份 (1-12):', new Date().getMonth() + 1);
+    if (!m || isNaN(m)) return;
+    const monthNum = parseInt(m);
+    if (monthNum < 1 || monthNum > 12) return alert('请输入 1-12 之间的数字');
+    if (!state.years[state.currentYear][monthNum]) state.years[state.currentYear][monthNum] = {};
+    state.currentMonth = monthNum;
+    save(); render();
+  });
+
+  document.getElementById('delYearBtn').addEventListener('click', function() {
+    const y = state.currentYear;
+    if (Object.keys(state.years).length <= 1) return alert('至少要保留一个年份');
+    if (!confirm(`确定要删除 ${y} 年的所有账本吗？`)) return;
+    if (!confirm(`【二次确认】删除后该年份下所有数据将清空，确定继续吗？`)) return;
     
-    state.columns.splice(index, 1);
-    state.rows.forEach((row, i) => {
-      row.cells.splice(index, 1);
-      if (row.children) {
-        row.children.forEach(c => c.cells.splice(index, 1));
-      }
-    });
+    deletedLedgerData = { type: 'year', year: y, data: JSON.parse(JSON.stringify(state.years[y])) };
+    delete state.years[y];
+    state.currentYear = Object.keys(state.years)[0]; // 切到第一个可用年
     save(); render();
-  }
+  });
 
-  document.getElementById('undoBtn').addEventListener('click', function() {
-    if (!deletedData) return;
-    if (deletedData.type === 'row') {
-      state.rows.splice(deletedData.index, 0, deletedData.data);
-    } else if (deletedData.type === 'col') {
-      state.columns.splice(deletedData.index, 0, deletedData.colName);
-      state.rows.forEach((row, i) => {
-        row.cells.splice(deletedData.index, 0, deletedData.data[i] || '');
-        if (row.children && deletedData.childData) {
-          row.children.forEach((c, j) => {
-            const val = deletedData.childData[i] && deletedData.childData[i][j] !== undefined ? deletedData.childData[i][j] : '';
-            c.cells.splice(deletedData.index, 0, val);
-          });
-        }
-      });
+  document.getElementById('delMonthBtn').addEventListener('click', function() {
+    const y = state.currentYear, m = state.currentMonth;
+    if (Object.keys(state.years[y]).length <= 1 && Object.keys(state.years).length <= 1) {
+      return alert('至少要保留一个月账本');
     }
-    deletedData = null;
+    if (!confirm(`确定要删除 ${y}年${m}月 的账本吗？`)) return;
+    if (!confirm(`【二次确认】该月的所有账目将被清空，确定继续吗？`)) return;
+    
+    deletedLedgerData = { type: 'month', year: y, month: m, data: JSON.parse(JSON.stringify(state.years[y][m])) };
+    delete state.years[y][m];
+    
+    // 自动切到相邻月份
+    if (m > 1) state.currentMonth = m - 1;
+    else {
+      if (Object.keys(state.years).length > 1) {
+        delete state.years[y]; // 只有1月且删除了，清理空年份
+        state.currentYear = Object.keys(state.years)[0];
+        state.currentMonth = 12;
+      } else {
+        state.currentMonth = 1;
+      }
+    }
+    save(); render();
+  });
+
+  document.getElementById('undoLedgerBtn').addEventListener('click', function() {
+    if (!deletedLedgerData) return;
+    if (deletedLedgerData.type === 'year') {
+      state.years[deletedLedgerData.year] = deletedLedgerData.data;
+      state.currentYear = deletedLedgerData.year;
+    } else if (deletedLedgerData.type === 'month') {
+      if (!state.years[deletedLedgerData.year]) state.years[deletedLedgerData.year] = {};
+      state.years[deletedLedgerData.year][deletedLedgerData.month] = deletedLedgerData.data;
+      state.currentYear = deletedLedgerData.year;
+      state.currentMonth = deletedLedgerData.month;
+    }
+    deletedLedgerData = null;
+    save(); render();
+  });
+
+  // ====== 表格事件 ======
+  document.getElementById('undoRowBtn').addEventListener('click', function() {
+    if (!deletedRowData) return;
+    getLedger().rows.splice(deletedRowData.index, 0, deletedRowData.data);
+    deletedRowData = null;
     save(); render();
   });
 
   document.getElementById('toggleModeBtn').addEventListener('click', function() {
     isDeleteMode = !isDeleteMode;
-    if (!isDeleteMode) deletedData = null;
+    if (!isDeleteMode) deletedRowData = null;
     render();
   });
 
   document.getElementById('addRowBtn').addEventListener('click', function() {
-    const cells = new Array(state.columns.length).fill('');
-    state.rows.push({ cells, children: [], isExpanded: false });
+    const ledger = getLedger();
+    const cells = new Array(ledger.columns.length).fill('');
+    ledger.rows.push({ cells, children: [], isExpanded: false });
     save(); render();
   });
 
   document.getElementById('addColBtn').addEventListener('click', function() {
-    state.columns.push('新列');
-    state.rows.forEach(row => {
+    const ledger = getLedger();
+    ledger.columns.push('新列');
+    ledger.rows.forEach(row => {
       row.cells.push('');
       if (row.children) row.children.forEach(c => c.cells.push(''));
     });
@@ -623,9 +820,9 @@
   });
 
   document.getElementById('clearBtn').addEventListener('click', function() {
-    if (!confirm('确定清空所有账目吗？此操作不可撤销。')) return;
-    state = JSON.parse(JSON.stringify(DEFAULT_DATA));
-    deletedData = null;
+    if (!confirm('确定清空本账本所有数据吗？此操作不可撤销。')) return;
+    state.years[state.currentYear][state.currentMonth] = JSON.parse(JSON.stringify(DEFAULT_LEDGER_DATA));
+    deletedRowData = null;
     save(); render();
   });
 
@@ -637,14 +834,15 @@
     const active = window._activeCell;
     if (active && active.el) {
       active.el.textContent = val;
+      const ledger = getLedger();
       if (active.isChild) {
-        state.rows[active.ri].children[active.cIdx].cells[active.ci] = val;
+        ledger.rows[active.ri].children[active.cIdx].cells[active.ci] = val;
         if (active.ci === amountColumnIndex()) {
           updateParentAmountDisplay(active.ri);
           renderTotal();
         }
       } else {
-        state.rows[active.ri].cells[active.ci] = val;
+        ledger.rows[active.ri].cells[active.ci] = val;
         renderTotal();
       }
       save();
