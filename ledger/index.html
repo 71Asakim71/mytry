@@ -294,8 +294,12 @@
 
       // 每一行的单元格下方附加颜色选择器（放在一个包裹里更整洁）
       // 为了不破坏表格结构，我们把颜色选择器放到“操作列”中
-      const tdOp = document.createElement('td');
-      tdOp.style.whiteSpace = 'nowrap';
+            const tdOp = document.createElement('td');
+      tdOp.style.width = '36px'; // 固定操作列的宽度
+      tdOp.style.padding = '4px 0';
+      
+      const tools = document.createElement('div');
+      tools.className = 'cell-tools'; // 用上我们刚写的上下排列样式
 
       const colorInput = document.createElement('input');
       colorInput.type = 'color';
@@ -305,7 +309,6 @@
       colorInput.addEventListener('input', function() {
         const color = this.value;
         state.rows[ri].rowColor = color;
-        // 同时应用到本行所有单元格
         const trEl = this.closest('tr');
         trEl.querySelectorAll('td[contenteditable]').forEach(tdEl => {
           tdEl.style.color = color;
@@ -322,10 +325,11 @@
         save(); render();
       });
 
-      tdOp.appendChild(colorInput);
-      tdOp.appendChild(delBtn);
+      // 把颜色和删除放进 tools 里，再把 tools 放进 tdOp
+      tools.appendChild(colorInput);
+      tools.appendChild(delBtn);
+      tdOp.appendChild(tools);
       tr.appendChild(tdOp);
-
       // 恢复整行颜色
       if (row.rowColor) {
         tr.querySelectorAll('td[contenteditable]').forEach(tdEl => {
