@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>极简记账 · Asakim</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f7fb;
+      color: #1e2b4f;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+    .container { max-width: 960px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 2rem; }
+    header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
+    header p { color: #6b7b9e; margin-top: 0.4rem; font-size: 0.95rem; }
+    .back-link {
+      display: inline-block; margin-bottom: 1rem; color: #6b7b9e;
+      text-decoration: none; font-size: 0.9rem;
+    }
+    .back-link:hover { color: #1e2b4f; }
+
+    /* 卡片样式，与首页一致 */
+    .card {
+      background: white; border-radius: 20px; padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+      border: 1px solid #e6ecf5; margin-bottom: 1.5rem;
+    }
+    .card-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }
+
+    /* 工具栏 */
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; align-items: center; }
+    .btn {
+      border: 1px solid #e6ecf5; background: #f9fbfe; color: #1e2b4f;
+      border-radius: 12px; padding: 0.45rem 0.9rem; font-size: 0.85rem;
+      cursor: pointer; transition: all 0.2s ease; font-family: inherit;
+    }
+    .btn:hover { background: #edf2fa; border-color: #b7c9e8; }
+    .btn-primary { background: #1e2b4f; color: white; border-color: #1e2b4f; }
+    .btn-primary:hover { background: #2a3d6b; }
+    .btn-danger { color: #c0392b; }
+    .btn-danger:hover { background: #fdf0ef; border-color: #e8c4c0; }
+
+    /* Emoji 快捷面板 */
+    .emoji-panel { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
+    .emoji-chip {
+      border: 1px solid #e6ecf5; background: white; border-radius: 10px;
+      padding: 0.3rem 0.55rem; font-size: 0.8rem; cursor: pointer;
+      transition: all 0.2s ease; font-family: inherit; color: #1e2b4f;
+    }
+    .emoji-chip:hover { background: #edf2fa; border-color: #b7c9e8; }
+
+    /* 表格 */
+    .table-wrap { overflow-x: auto; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; min-width: 600px; }
+    th, td { padding: 0.5rem; border-bottom: 1px solid #eef2f8; text-align: left; vertical-align: top; }
+    th { font-weight: 600; font-size: 0.85rem; color: #6b7b9e; padding-bottom: 0.7rem; }
+    td[contenteditable="true"] {
+      outline: none; border-radius: 8px; transition: background 0.15s ease;
+      min-width: 60px; word-break: break-word;
+    }
+    td[contenteditable="true"]:focus { background: #f0f4fb; }
+    .cell-tools { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.25rem; }
+    .color-input {
+      width: 26px; height: 26px; border: 1px solid #e6ecf5; border-radius: 8px;
+      padding: 2px; cursor: pointer; background: white;
+    }
+    .row-del {
+      border: none; background: transparent; color: #c0392b; cursor: pointer;
+      font-size: 1.1rem; padding: 0.2rem 0.4rem; border-radius: 8px;
+    }
+    .row-del:hover { background: #fdf0ef; }
+
+    /* 总计 */
+    .total-bar {
+      display: flex; justify-content: flex-end; align-items: baseline; gap: 0.6rem;
+      padding-top: 0.8rem; border-top: 2px solid #eef2f8; font-size: 1rem;
+    }
+    .total-amount { font-size: 1.4rem; font-weight: 700; color: #1e2b4f; }
+
+    .empty-hint { color: #9aaac9; font-size: 0.9rem; text-align: center; padding: 2rem 0; }
+    footer { text-align: center; margin-top: 2rem; color: #9aaac9; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <a class="back-link" href="../">← 返回工具箱</a>
+  <header>
+    <h1>📒 极简记账</h1>
+    <p>自己建表，随手记，自动算</p>
+  </header>
+
+  <!-- 分类快捷面板 -->
+  <div class="card">
+    <div class="card-title">🍽️ 分类快捷填入</div>
+    <p style="color:#7b8aa6; font-size:0.85rem; margin-bottom:0.8rem;">
+      点击下方标签，将“Emoji + 文字”填入当前选中的单元格。也可以直接手动输入新的分类。
+    </p>
+    <div class="emoji-panel" id="emojiPanel"></div>
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+      <span style="font-size:0.85rem; color:#6b7b9e;">手动添加分类：</span>
+      <input id="customCategory" type="text" placeholder="例如：🎮 游戏"
+        style="flex:1; border:1px solid #e6ecf5; border-radius:12px; padding:0.5rem 0.8rem; font-family:inherit; font-size:0.9rem; outline:none;">
+      <button class="btn" id="addCategoryBtn">添加</button>
+    </div>
+  </div>
+
+  <!-- 账目表格 -->
+  <div class="card">
+    <div class="toolbar">
+      <button class="btn btn-primary" id="addRowBtn">＋ 加一行</button>
+      <button class="btn" id="addColBtn">＋ 加一列</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-danger" id="clearBtn">清空所有数据</button>
+    </div>
+    <div class="table-wrap">
+      <table id="ledgerTable">
+        <thead id="tableHead"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="total-bar">
+      <span style="color:#6b7b9e;">总计</span>
+      <span class="total-amount" id="totalDisplay">0</span>
+    </div>
+  </div>
+
+  <footer>数据保存在本机浏览器中 · Asakim 工具箱</footer>
+</div>
+
+<script>
+(function() {
+  const STORAGE_KEY = 'asakim_ledger_v1';
+
+  // ---------- 默认结构 ----------
+  const DEFAULT_DATA = {
+    columns: ['日期', '分类', '名称', '金额'],
+    rows: [
+      { cells: ['', '🍚 早餐', '豆浆油条', '8'] },
+      { cells: ['', '🍜 午餐', '牛肉面', '22'] },
+      { cells: ['', '🧋 奶茶', '', '15'] }
+    ]
+  };
+
+  let state = load();
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.columns && parsed.rows) return parsed;
+      }
+    } catch (e) {}
+    return JSON.parse(JSON.stringify(DEFAULT_DATA));
+  }
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  // ---------- Emoji 快捷数据 ----------
+  const EMOJIS = [
+    '🍚 早餐', '🍜 午餐', '🍽️ 晚餐', '🧋 奶茶', '☕ 咖啡',
+    '🚌 交通', '🛒 购物', '🏠 房租', '💡 水电', '📱 话费',
+    '🎮 游戏', '📚 书籍', '💊 医疗', '🎁 礼物', '✈️ 旅行',
+    '🐱 宠物', '👕 服饰', '🧴 日用品', '💰 工资', '🧧 红包'
+  ];
+
+  // ---------- 渲染 ----------
+  function render() {
+    renderHead();
+    renderBody();
+    renderTotal();
+    renderEmojiPanel();
+  }
+
+  function renderHead() {
+    const thead = document.getElementById('tableHead');
+    thead.innerHTML = '';
+    const tr = document.createElement('tr');
+    state.columns.forEach((col, ci) => {
+      const th = document.createElement('th');
+      th.textContent = col;
+      // 列头也可编辑
+      th.style.cursor = 'text';
+      th.addEventListener('dblclick', function() {
+        const newName = prompt('修改列名', col);
+        if (newName !== null && newName.trim() !== '') {
+          state.columns[ci] = newName.trim();
+          save(); render();
+        }
+      });
+      tr.appendChild(th);
+    });
+    // 操作列头
+    const thOp = document.createElement('th');
+    thOp.textContent = '';
+    thOp.style.width = '40px';
+    tr.appendChild(thOp);
+    thead.appendChild(tr);
+  }
+
+  function renderBody() {
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    if (state.rows.length === 0) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = state.columns.length + 1;
+      td.className = 'empty-hint';
+      td.textContent = '还没有账目，点击上方「加一行」开始记录。';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+
+    state.rows.forEach((row, ri) => {
+      const tr = document.createElement('tr');
+      // 确保单元格数量与列数一致
+      while (row.cells.length < state.columns.length) row.cells.push('');
+
+      row.cells.forEach((cellVal, ci) => {
+        const td = document.createElement('td');
+        td.setAttribute('contenteditable', 'true');
+        td.textContent = cellVal;
+        td.dataset.row = ri;
+        td.dataset.col = ci;
+
+        // 如果之前保存过颜色，恢复
+        if (row.colors && row.colors[ci]) {
+          td.style.color = row.colors[ci];
+        }
+
+        // 输入时保存
+        td.addEventListener('input', function() {
+          state.rows[ri].cells[ci] = this.textContent;
+          save();
+          if (ci === amountColumnIndex()) renderTotal();
+        });
+
+        // 失焦时清理空白
+        td.addEventListener('blur', function() {
+          if (this.textContent.trim() === '') {
+            this.textContent = '';
+            state.rows[ri].cells[ci] = '';
+            save();
+          }
+        });
+
+        // 点击时记录当前选中单元格，供 emoji 面板使用
+        td.addEventListener('click', function() {
+          window._activeCell = { ri, ci, el: this };
+        });
+
+        tr.appendChild(td);
+      });
+
+      // 每一行的单元格下方附加颜色选择器（放在一个包裹里更整洁）
+      // 为了不破坏表格结构，我们把颜色选择器放到“操作列”中
+      const tdOp = document.createElement('td');
+      tdOp.style.whiteSpace = 'nowrap';
+
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.className = 'color-input';
+      colorInput.title = '修改本行字体颜色';
+      colorInput.value = row.rowColor || '#1e2b4f';
+      colorInput.addEventListener('input', function() {
+        const color = this.value;
+        state.rows[ri].rowColor = color;
+        // 同时应用到本行所有单元格
+        const trEl = this.closest('tr');
+        trEl.querySelectorAll('td[contenteditable]').forEach(tdEl => {
+          tdEl.style.color = color;
+        });
+        save();
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'row-del';
+      delBtn.textContent = '✕';
+      delBtn.title = '删除这一行';
+      delBtn.addEventListener('click', function() {
+        state.rows.splice(ri, 1);
+        save(); render();
+      });
+
+      tdOp.appendChild(colorInput);
+      tdOp.appendChild(delBtn);
+      tr.appendChild(tdOp);
+
+      // 恢复整行颜色
+      if (row.rowColor) {
+        tr.querySelectorAll('td[contenteditable]').forEach(tdEl => {
+          tdEl.style.color = row.rowColor;
+        });
+      }
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  function amountColumnIndex() {
+    // 找“金额”列的位置，找不到就用最后一列
+    const idx = state.columns.findIndex(c => c.includes('金额'));
+    return idx >= 0 ? idx : state.columns.length - 1;
+  }
+
+  function renderTotal() {
+    const idx = amountColumnIndex();
+    let sum = 0;
+    state.rows.forEach(row => {
+      const val = parseFloat(row.cells[idx]);
+      if (!isNaN(val)) sum += val;
+    });
+    document.getElementById('totalDisplay').textContent =
+      sum % 1 === 0 ? sum.toString() : sum.toFixed(2);
+  }
+
+  function renderEmojiPanel() {
+    const panel = document.getElementById('emojiPanel');
+    panel.innerHTML = '';
+    EMOJIS.forEach(text => {
+      const chip = document.createElement('button');
+      chip.className = 'emoji-chip';
+      chip.textContent = text;
+      chip.addEventListener('click', function() {
+        const active = window._activeCell;
+        if (active && active.el) {
+          active.el.textContent = text;
+          state.rows[active.ri].cells[active.ci] = text;
+          save();
+          renderTotal();
+        } else {
+          alert('请先点击表格中的一个单元格，再选择分类。');
+        }
+      });
+      panel.appendChild(chip);
+    });
+  }
+
+  // ---------- 操作 ----------
+  document.getElementById('addRowBtn').addEventListener('click', function() {
+    const cells = new Array(state.columns.length).fill('');
+    state.rows.push({ cells });
+    save(); render();
+    // 滚动到新行
+    setTimeout(() => {
+      const rows = document.querySelectorAll('#tableBody tr');
+      if (rows.length) rows[rows.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+  });
+
+  document.getElementById('addColBtn').addEventListener('click', function() {
+    state.columns.push('新列');
+    state.rows.forEach(row => row.cells.push(''));
+    save(); render();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', function() {
+    if (!confirm('确定清空所有账目吗？此操作不可撤销。')) return;
+    state = JSON.parse(JSON.stringify(DEFAULT_DATA));
+    save(); render();
+  });
+
+  // 手动添加分类
+  document.getElementById('addCategoryBtn').addEventListener('click', function() {
+    const input = document.getElementById('customCategory');
+    const val = input.value.trim();
+    if (!val) return;
+    const active = window._activeCell;
+    if (active && active.el) {
+      active.el.textContent = val;
+      state.rows[active.ri].cells[active.ci] = val;
+      save(); renderTotal();
+    } else {
+      alert('请先点击表格中的一个单元格，再添加分类。');
+    }
+    input.value = '';
+  });
+
+  document.getElementById('customCategory').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('addCategoryBtn').click();
+  });
+
+  // 点击表格空白处清除 activeCell 标记（可选，避免误填）
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('td[contenteditable="true"]')) {
+      // 不立即清除，给 emoji 按钮留出点击时间
+    }
+  });
+
+  // ---------- 初始化 ----------
+  render();
+})();
+</script>
+</body>
+</html>
