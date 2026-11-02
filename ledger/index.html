@@ -33,7 +33,7 @@
 
     /* 账本导航栏 */
     .ledger-nav {
-      display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; position: relative;
+      display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem;
     }
     .select-box {
       border: 1px solid #e6ecf5; background: #f9fbfe; border-radius: 12px;
@@ -42,24 +42,10 @@
     }
     .select-box:hover { background: #edf2fa; border-color: #b7c9e8; }
 
-    /* 数据下拉菜单 */
-    .dropdown { position: relative; display: inline-block; margin-left: auto; }
-    .dropdown-menu {
-      display: none; position: absolute; right: 0; top: 100%; margin-top: 0.5rem;
-      background: white; border: 1px solid #e6ecf5; border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.08); z-index: 100; min-width: 160px; overflow: hidden;
-    }
-    .dropdown-menu.show { display: block; animation: fadeIn 0.15s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-    .dropdown-item {
-      display: block; width: 100%; padding: 0.7rem 1rem; text-align: left;
-      border: none; background: transparent; cursor: pointer; font-family: inherit;
-      font-size: 0.85rem; color: #1e2b4f; transition: background 0.2s;
-    }
-    .dropdown-item:hover { background: #f5f7fb; }
-
     /* 工具栏 */
     .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; align-items: center; }
+    .data-tools { display: flex; gap: 0.5rem; border-top: 1px dashed #eef2f8; padding-top: 1rem; flex-wrap: wrap;}
+    
     .btn {
       border: 1px solid #e6ecf5; background: #f9fbfe; color: #1e2b4f;
       border-radius: 12px; padding: 0.35rem 0.75rem; font-size: 0.85rem;
@@ -70,6 +56,7 @@
     .btn-primary { background: #1e2b4f; color: white; border-color: #1e2b4f; }
     .btn-danger { background: #fdf0ef; color: #c0392b; border-color: #e8c4c0; }
     .btn-danger:hover { background: #fbe4e2; }
+    .btn-tool { background: #e0f2fe; color: #0284c7; border-color: #bae6fd; }
     
     /* 模式按钮 */
     .btn-mode-active { background: #1e2b4f; color: white; border-color: #1e2b4f; }
@@ -183,15 +170,16 @@
     /* ===== 弹窗通用 ===== */
     .modal-overlay {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(30, 43, 79, 0.4); backdrop-filter: blur(2px);
-      display: none; justify-content: center; align-items: center; z-index: 1000;
+      background: rgba(30, 43, 79, 0.6); 
+      display: none; justify-content: center; align-items: center; z-index: 9999;
       padding: 1rem;
     }
     .modal-overlay.show { display: flex; }
     .modal-content {
       background: white; border-radius: 20px; padding: 1.5rem;
-      width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      position: relative;
     }
     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
     .modal-title { font-size: 1.2rem; font-weight: 700; }
@@ -211,17 +199,18 @@
     .report-total { font-size: 1.2rem; font-weight: 700; color: #1e2b4f; text-align: right; margin-top: 1rem; padding-top: 1rem; border-top: 2px solid #eef2f8;}
 
     /* 导出弹窗专用 */
-    .export-btn-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
-    .export-btn {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      background: #1e2b4f; color: white; text-decoration: none;
-      padding: 0.8rem; border-radius: 12px; font-weight: 600; border: none; cursor: pointer; width: 100%;
-      transition: opacity 0.2s;
+    .export-textarea {
+      width: 100%; height: 200px; padding: 10px; margin-bottom: 10px;
+      border: 1px solid #e6ecf5; border-radius: 8px; background: #f9fbfe;
+      font-family: monospace; font-size: 12px; color: #1e2b4f; resize: vertical;
     }
-    .export-btn:active { opacity: 0.8; }
-    .export-btn.secondary { background: #5b8ff9; }
-    .export-btn.outline { background: white; border: 1px solid #e6ecf5; color: #1e2b4f; }
-    .export-tip { font-size: 0.8rem; color: #9aaac9; line-height: 1.5; text-align: left; background: #f9fbfe; padding: 10px; border-radius: 8px;}
+    .copy-btn {
+      display: block; width: 100%; text-align: center;
+      background: #1e2b4f; color: white; padding: 0.8rem;
+      border-radius: 12px; font-size: 0.95rem; font-weight: 600;
+      border: none; cursor: pointer; transition: background 0.2s;
+    }
+    .copy-btn:active { background: #2a3d6b; }
 
     /* ===== 手机端适配 ===== */
     @media (max-width: 600px) {
@@ -251,7 +240,7 @@
     <p>支持分项记录，自动汇总计算</p>
   </header>
 
-  <!-- 账本导航 -->
+  <!-- 账本导航与数据工具 -->
   <div class="card">
     <div class="ledger-nav">
       <select id="yearSelect" class="select-box"></select>
@@ -260,18 +249,14 @@
       <button class="btn btn-danger" id="delYearBtn">✕ 删年</button>
       <button class="btn" id="addMonthBtn">＋ 月</button>
       <button class="btn btn-danger" id="delMonthBtn">✕ 删月</button>
-      
-      <!-- 数据工具下拉菜单 -->
-      <div class="dropdown">
-        <button class="btn" id="dataToolBtn">📊 数据工具 ▾</button>
-        <div class="dropdown-menu" id="dataToolMenu">
-          <button class="dropdown-item" id="exportDataBtn">📤 导出与备份</button>
-          <button class="dropdown-item" id="monthReportBtn">📈 生成月报表</button>
-          <button class="dropdown-item" id="yearReportBtn">📅 生成年报表</button>
-        </div>
-      </div>
-
-      <button class="btn" id="undoLedgerBtn" style="display:none; margin-left: 10px; color: #c0392b; background: #fdf0ef;">↩️ 撤销删账本</button>
+      <button class="btn" id="undoLedgerBtn" style="display:none; color: #c0392b; background: #fdf0ef;">↩️ 撤销删账本</button>
+    </div>
+    
+    <!-- 数据工具（平铺，避免菜单冲突） -->
+    <div class="data-tools">
+      <button class="btn btn-tool" id="exportDataBtn">📤 导出与备份</button>
+      <button class="btn btn-tool" id="monthReportBtn">📈 生成月报表</button>
+      <button class="btn btn-tool" id="yearReportBtn">📅 生成年报表</button>
     </div>
   </div>
 
@@ -332,27 +317,21 @@
   </div>
 </div>
 
-<!-- 导出与备份弹窗 -->
+<!-- 导出弹窗 -->
 <div class="modal-overlay" id="exportModal">
   <div class="modal-content">
     <div class="modal-header">
-      <div class="modal-title">📤 导出与备份</div>
+      <div class="modal-title">📤 导出备份</div>
       <button class="modal-close" id="closeExportBtn">×</button>
     </div>
     
-    <div class="export-btn-group">
-      <button id="copyTableBtn" class="export-btn">📊 复制为表格 (直接粘贴进 Excel)</button>
-      <button id="copyJsonBtn" class="export-btn secondary">📝 复制纯文本备份 (JSON格式)</button>
-    </div>
+    <p style="font-size: 0.85rem; color: #6b7b9e; margin-bottom: 10px;">
+      点击下方按钮复制表格数据，然后去 Excel / WPS 里直接粘贴即可。
+    </p>
     
-    <div class="export-tip">
-      <strong>💡 怎么用？</strong><br>
-      1. 点击上方“复制为表格”。<br>
-      2. 打开电脑或手机的 Excel / WPS / 备忘录。<br>
-      3. 找个空白格，直接“粘贴”，表格就完美生成了！<br>
-      <br>
-      <em>（复制 JSON 备份适合保存在备忘录里，以后可以找我帮你恢复数据。）</em>
-    </div>
+    <textarea id="exportTextArea" class="export-textarea" readonly></textarea>
+    
+    <button id="doCopyBtn" class="copy-btn">📋 一键复制表格文本</button>
   </div>
 </div>
 
@@ -1050,154 +1029,87 @@
     save(); render();
   });
 
-  // ====== 数据工具下拉菜单 ======
-  const dataToolBtn = document.getElementById('dataToolBtn');
-  const dataToolMenu = document.getElementById('dataToolMenu');
-  
-  dataToolBtn.addEventListener('click', function(e) {
-    e.stopPropagation();
-    dataToolMenu.classList.toggle('show');
-  });
-
-  dataToolMenu.addEventListener('click', function(e) {
-    e.stopPropagation(); 
-  });
-
-  document.addEventListener('click', function(e) {
-    if (!dataToolMenu.contains(e.target) && e.target !== dataToolBtn) {
-      dataToolMenu.classList.remove('show');
-    }
-  });
-
-  // ====== 导出与备份功能 ======
+  // ====== 导出与备份功能（全浏览器兼容版） ======
   const exportModal = document.getElementById('exportModal');
   const closeExportBtn = document.getElementById('closeExportBtn');
-  const copyTableBtn = document.getElementById('copyTableBtn');
-  const copyJsonBtn = document.getElementById('copyJsonBtn');
+  const exportTextArea = document.getElementById('exportTextArea');
+  const doCopyBtn = document.getElementById('doCopyBtn');
 
   closeExportBtn.addEventListener('click', () => exportModal.classList.remove('show'));
   exportModal.addEventListener('click', (e) => {
     if (e.target === exportModal) exportModal.classList.remove('show');
   });
 
-  // 复制为 HTML 表格 (粘贴到 Excel)
-  copyTableBtn.addEventListener('click', function() {
+  // 点击导出按钮，生成数据
+  document.getElementById('exportDataBtn').addEventListener('click', function() {
     const ledger = getLedger();
     const amtIdx = amountColumnIndex(ledger);
     
-    // 生成 HTML 表格，带上必要的样式，方便直接粘贴到 Excel 中
-    let html = '<table border="1" style="border-collapse: collapse; text-align: left;">';
-    // 表头
-    html += '<tr>';
-    ledger.columns.forEach(col => { html += `<th style="padding: 5px; background-color: #f0f0f0;">${col}</th>`; });
-    html += '</tr>';
+    let csvContent = "";
+    csvContent += ledger.columns.join("\t") + "\n"; // 使用制表符，粘贴 Excel 完美兼容
     
-    // 数据行
     ledger.rows.forEach(row => {
       const parentCells = [...row.cells];
       if (row.children && row.children.length > 0) {
         parentCells[amtIdx] = getRowAmount(row, amtIdx);
       }
-      
-      // 父行
-      html += '<tr>';
-      parentCells.forEach(c => { html += `<td style="padding: 5px;">${c || ''}</td>`; });
-      html += '</tr>';
-      
-      // 子行
+      csvContent += parentCells.join("\t") + "\n";
       if (row.children && row.children.length > 0) {
         row.children.forEach(child => {
-          html += '<tr>';
-          child.cells.forEach((c, i) => { 
-            let text = c || '';
-            if (i === 0) text = "└ " + text; // 加个前缀标识
-            html += `<td style="padding: 5px; color: #666;">${text}</td>`; 
-          });
-          html += '</tr>';
+          const childCells = [...child.cells];
+          childCells[0] = "  └ " + (childCells[0] || '');
+          csvContent += childCells.join("\t") + "\n";
         });
       }
     });
-    html += '</table>';
 
-    // 核心：同时向剪贴板写入 text/html 和 text/plain，这样粘贴到 Excel 就是表格，粘贴到 txt 就是纯文本
-    const textVersion = ledger.columns.join('\t') + '\n' + 
-      ledger.rows.map(r => r.cells.join('\t')).join('\n');
-
-    try {
-      const clipboardItem = new ClipboardItem({
-        'text/html': new Blob([html], { type: 'text/html' }),
-        'text/plain': new Blob([textVersion], { type: 'text/plain' })
-      });
-      
-      navigator.clipboard.write([clipboardItem]).then(() => {
-        this.textContent = '✅ 已复制！去 Excel 粘贴吧';
-        setTimeout(() => { this.textContent = '📊 复制为表格 (直接粘贴进 Excel)'; exportModal.classList.remove('show'); }, 2000);
-      }).catch(err => {
-        fallbackCopy(html);
-      });
-    } catch (err) {
-      fallbackCopy(html);
-    }
-
-    function fallbackCopy(htmlStr) {
-      // 针对不支持 ClipboardItem 的老浏览器
-      const el = document.createElement('div');
-      el.innerHTML = htmlStr;
-      el.style.position = 'fixed';
-      el.style.left = '-9999px';
-      document.body.appendChild(el);
-      
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      
-      try {
-        document.execCommand('copy');
-        this.textContent = '✅ 已复制！去 Excel 粘贴吧';
-        setTimeout(() => { this.textContent = '📊 复制为表格 (直接粘贴进 Excel)'; exportModal.classList.remove('show'); }, 2000);
-      } catch (e) {
-        alert('复制失败，请检查浏览器权限');
-      }
-      
-      document.body.removeChild(el);
-    }
-  });
-
-  // 复制 JSON 备份
-  copyJsonBtn.addEventListener('click', function() {
-    const jsonStr = JSON.stringify(state);
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(jsonStr).then(() => {
-        this.textContent = '✅ JSON 备份已复制到剪贴板';
-        setTimeout(() => { this.textContent = '📝 复制纯文本备份 (JSON格式)'; exportModal.classList.remove('show'); }, 2000);
-      }).catch(() => {
-        fallbackCopyText(jsonStr);
-      });
-    } else {
-      fallbackCopyText(jsonStr);
-    }
-
-    function fallbackCopyText(text) {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        this.textContent = '✅ JSON 备份已复制到剪贴板';
-        setTimeout(() => { this.textContent = '📝 复制纯文本备份 (JSON格式)'; exportModal.classList.remove('show'); }, 2000);
-      } catch (err) {
-        alert("复制失败，请手动选择复制");
-      }
-      document.body.removeChild(textArea);
-    }
-  });
-
-  document.getElementById('exportDataBtn').addEventListener('click', function() {
-    dataToolMenu.classList.remove('show');
+    exportTextArea.value = csvContent;
     exportModal.classList.add('show');
+  });
+
+  // 终极兼容的复制逻辑
+  doCopyBtn.addEventListener('click', async function() {
+    const textToCopy = exportTextArea.value;
+    let copySuccess = false;
+
+    // 方案一：现代浏览器（Edge、Chrome、vivo 自带等）
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        copySuccess = true;
+      } catch (err) {
+        console.warn('现代剪贴板失败，尝试降级', err);
+      }
+    }
+
+    // 方案二：传统兼容模式（微信内置、老版本浏览器等）
+    if (!copySuccess) {
+      try {
+        exportTextArea.focus();
+        exportTextArea.select();
+        exportTextArea.setSelectionRange(0, 99999);
+        copySuccess = document.execCommand('copy');
+      } catch (err) {
+        console.warn('传统复制失败', err);
+      }
+    }
+
+    // 反馈结果
+    if (copySuccess) {
+      const originalText = this.textContent;
+      this.textContent = '✅ 复制成功！去粘贴吧';
+      this.style.background = '#10b981'; // 变绿
+      setTimeout(() => { 
+        this.textContent = originalText; 
+        this.style.background = '#1e2b4f';
+      }, 2000);
+    } else {
+      // 如果自动复制失败，帮助用户全选，让用户手动长按复制
+      exportTextArea.focus();
+      exportTextArea.select();
+      exportTextArea.setSelectionRange(0, 99999);
+      alert('自动复制被浏览器拦截。已为您全选文字，请直接长按文本框，选择“复制”。');
+    }
   });
 
   // ====== 报表渲染（纯 CSS 极简图表） ======
@@ -1237,7 +1149,6 @@
   }
 
   document.getElementById('monthReportBtn').addEventListener('click', function() {
-    dataToolMenu.classList.remove('show');
     const ledger = getLedger();
     const amtIdx = amountColumnIndex(ledger);
     const catIdx = ledger.columns.findIndex(c => c.includes('分类'));
@@ -1278,7 +1189,6 @@
   });
 
   document.getElementById('yearReportBtn').addEventListener('click', function() {
-    dataToolMenu.classList.remove('show');
     const y = state.currentYear;
     const yearData = state.years[y] || {};
     
