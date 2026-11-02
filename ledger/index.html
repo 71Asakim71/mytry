@@ -182,7 +182,7 @@
     .empty-hint { color: #9aaac9; font-size: 0.9rem; text-align: center; padding: 2rem 0; }
     footer { text-align: center; margin-top: 2rem; color: #9aaac9; font-size: 0.85rem; }
 
-    /* ===== 报表弹窗 ===== */
+    /* ===== 弹窗通用 ===== */
     .modal-overlay {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(30, 43, 79, 0.4); backdrop-filter: blur(2px);
@@ -210,6 +210,13 @@
     .report-item { display: flex; justify-content: space-between; padding: 0.6rem 0; border-bottom: 1px solid #f5f7fb; font-size: 0.9rem;}
     .report-item:last-child { border-bottom: none; }
     .report-total { font-size: 1.2rem; font-weight: 700; color: #1e2b4f; text-align: right; margin-top: 1rem; padding-top: 1rem; border-top: 2px solid #eef2f8;}
+
+    /* 导出弹窗专用链接按钮 */
+    .export-link-btn {
+      display: inline-block; background: #1e2b4f; color: white; text-decoration: none;
+      padding: 0.6rem 1.2rem; border-radius: 12px; margin-top: 1rem; font-weight: 600;
+    }
+    .export-link-btn:hover { background: #2a3d6b; }
 
     /* ===== 手机端适配 ===== */
     @media (max-width: 600px) {
@@ -323,10 +330,27 @@
   </div>
 </div>
 
+<!-- 导出弹窗（专为手机适配） -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal-content" style="text-align: center;">
+    <div class="modal-header" style="justify-content: center;">
+      <div class="modal-title">📥 导出账本</div>
+    </div>
+    <p style="color: #6b7b9e; font-size: 0.9rem; margin-bottom: 1rem;">
+      由于手机浏览器限制，请点击下方按钮保存文件：
+    </p>
+    <a id="downloadLink" class="export-link-btn" href="#">点击下载 CSV 文件</a>
+    <p style="color: #9aaac9; font-size: 0.75rem; margin-top: 1.5rem;">
+      提示：若无法下载，请点击右上角选择“在浏览器中打开”后重试。
+    </p>
+    <button class="btn" id="closeExportBtn" style="margin-top: 1rem;">关闭</button>
+  </div>
+</div>
+
 <script>
 (function() {
   const STORAGE_KEY = 'asakim_ledger_v3';
-  let myChart = null; // 用于存储图表实例
+  let myChart = null; 
 
   const DEFAULT_LEDGER_DATA = {
     columns: ['日期', '分类', '名称', '金额'],
@@ -521,6 +545,25 @@
       sum % 1 === 0 ? sum.toString() : sum.toFixed(2);
   }
 
+  // 局部更新父行金额显示，不引发重绘
+  function updateParentAmountDisplay(ri) {
+    const ledger = getLedger();
+    const row = ledger.rows[ri];
+    const amtIdx = amountColumnIndex(ledger);
+    const autoSum = getRowAmount(row, amtIdx);
+    
+    const tbody = document.getElementById('tableBody');
+    const parentTrs = Array.from(tbody.children).filter(tr => !tr.classList.contains('child-row'));
+    const currentTr = parentTrs[ri];
+    
+    if (currentTr) {
+      const amountTd = currentTr.children[amtIdx];
+      if (amountTd) {
+        amountTd.textContent = autoSum % 1 === 0 ? autoSum.toString() : autoSum.toFixed(2);
+      }
+    }
+  }
+
   function renderEmojiPanel() {
     const panel = document.getElementById('emojiPanel');
     panel.innerHTML = '';
@@ -548,11 +591,12 @@
             if (active.isChild) {
               ledger.rows[active.ri].children[active.cIdx].cells[active.ci] = text;
               if (active.ci === amountColumnIndex(ledger)) {
-                render(); 
+                updateParentAmountDisplay(active.ri);
+                renderTotal();
               }
             } else {
               ledger.rows[active.ri].cells[active.ci] = text;
-              render();
+              renderTotal();
             }
             save();
           } else {
@@ -771,7 +815,9 @@
                   child.cells[ci] = this.textContent;
                   save();
                   if (ci === amtIdx) {
-                    render(); 
+                    // 修复键盘收起BUG：只更新数据，不重绘 DOM
+                    updateParentAmountDisplay(ri);
+                    renderTotal();
                   }
                 });
                 childTd.addEventListener('click', function() {
@@ -1013,7 +1059,13 @@
     '#6dc8ec', '#9270ca', '#ff9d4d', '#269a99', '#ff99c3'
   ];
 
-  // 1. 导出 CSV
+  // 1. 导出 CSV (修复手机端下载问题)
+  const exportModal = document.getElementById('exportModal');
+  const closeExportBtn = document.getElementById('closeExportBtn');
+  const downloadLink = document.getElementById('downloadLink');
+
+  closeExportBtn.addEventListener('click', () => exportModal.classList.remove('show'));
+
   document.getElementById('exportCsvBtn').addEventListener('click', function() {
     dataToolMenu.classList.remove('show');
     const ledger = getLedger();
@@ -1036,14 +1088,15 @@
       }
     });
 
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Asakim账本_${state.currentYear}年${state.currentMonth}月.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // 使用 Data URI 方式，更适合移动端浏览器点击真实链接下载
+    const encodedUri = encodeURI("data:text/csv;charset=utf-8,\uFEFF" + csvContent);
+    const fileName = `Asakim账本_${state.currentYear}年${state.currentMonth}月.csv`;
+    
+    downloadLink.href = encodedUri;
+    downloadLink.download = fileName;
+    
+    // 显示弹窗让用户手动点击下载
+    exportModal.classList.add('show');
   });
 
   // 报表弹窗相关
@@ -1137,7 +1190,6 @@
     let yearTotal = 0;
     let monthSummary = [];
 
-    // 固定生成1-12月的数据
     for (let m = 1; m <= 12; m++) {
       let monthSum = 0;
       if (yearData[m]) {
